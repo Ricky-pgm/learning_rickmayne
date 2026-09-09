@@ -28,6 +28,7 @@ import { CodeComplete } from "@/components/study/exercises/code-complete"
 import { WebEnrichmentView } from "@/components/study/web-enrichment-view"
 import { StudyPhase } from "@/components/study/study-phase"
 import { TimeRing } from "@/components/study/time-ring"
+import { ChapterCompleteCelebration } from "@/components/study/chapter-complete-celebration"
 import { getExerciseSlots } from "@/lib/study/exercise-strategy"
 import { estimateChapterTime } from "@/lib/study/time-estimate"
 import { getCachedFlashcards } from "@/lib/study/flashcard-queries"
@@ -66,6 +67,11 @@ export default function StudyChapterPage({
   // estimateChapterTime retombe alors sur une estimation à partir du
   // nombre de concepts.
   const [realFlashcardCount, setRealFlashcardCount] = useState<number | undefined>(undefined)
+  // Célébration déclenchée au passage de <3 à 3 phases faites — pas à
+  // chaque re-render une fois à 3 (sinon rouverte à chaque changement
+  // d'onglet d'exercice une fois le chapitre déjà fini).
+  const [showCelebration, setShowCelebration] = useState(false)
+  const [celebrationShown, setCelebrationShown] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -97,6 +103,17 @@ export default function StudyChapterPage({
       })
     return () => { cancelled = true }
   }, [chapter])
+
+  // Déclenche la célébration exactement au passage à 3 phases faites —
+  // recalculé ici plutôt qu'à partir de la variable phasesDone plus bas
+  // (dérivée après les early-returns) pour rester un Hook inconditionnel.
+  useEffect(() => {
+    const done = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (visitedExercises.size > 0 ? 1 : 0)
+    if (done >= 3 && !celebrationShown) {
+      setShowCelebration(true)
+      setCelebrationShown(true)
+    }
+  }, [lessonOpened, flashcardsDone, visitedExercises, celebrationShown])
 
   if (loading) {
     return (
@@ -131,9 +148,18 @@ export default function StudyChapterPage({
   const courseTitle = chapter.course_title
   const timeEstimate = estimateChapterTime(chapter.concepts.length, chapter.profile, chapter.has_code, realFlashcardCount)
   const phasesDone = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (visitedExercises.size > 0 ? 1 : 0)
+  const nextChapter = positionInCourse < totalChapters ? allChapters[positionInCourse] : null
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 space-y-10">
+      <ChapterCompleteCelebration
+        open={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        chapterTitle={chapter.title}
+        nextHref={nextChapter ? `/etude/${chapter.study_course_id}/kapitel/${nextChapter.id}` : null}
+        nextChapterTitle={nextChapter?.title ?? null}
+      />
+
       {/* Breadcrumb + titre : un seul groupe visuel, séparé des phases
           par l'espacement du parent. */}
       <div className="space-y-4">
