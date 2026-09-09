@@ -80,8 +80,8 @@ export function DetailedLessonView({ chapter, lang, onOpenChange }: Props) {
     <Collapsible open={open} onOpenChange={setOpen} className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-none">
       <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/30">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-ring/10">
-            <BookOpen className="h-5 w-5 text-ring" />
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-accent-brand/10">
+            <BookOpen className="h-5 w-5 text-accent-brand" />
           </div>
           <div className="min-w-0">
             <p className="text-lg font-semibold">Cours détaillé</p>
@@ -144,7 +144,7 @@ export function DetailedLessonView({ chapter, lang, onOpenChange }: Props) {
                     className={cn(
                       "flex-shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
                       i === activeSection
-                        ? "bg-ring text-primary-foreground"
+                        ? "bg-accent-brand text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:bg-muted/80",
                     )}
                   >
@@ -166,7 +166,7 @@ export function DetailedLessonView({ chapter, lang, onOpenChange }: Props) {
                 >
                   {/* Section header */}
                   <div className="flex items-start gap-3">
-                    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-ring/10 text-xs font-bold text-ring mt-0.5">
+                    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-accent-brand/10 text-xs font-bold text-accent-brand mt-0.5">
                       {i + 1}
                     </div>
                     <h3 className="scroll-m-20 text-xl font-semibold tracking-tight sm:text-2xl pt-0.5">

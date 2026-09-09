@@ -24,7 +24,7 @@ interface Props {
 const GRADE_CONFIG: { grade: FlashcardGrade; label: string; icon: typeof RotateCcw; tone: string }[] = [
   { grade: "again", label: "À revoir", icon: RotateCcw, tone: "border-destructive/30 text-destructive hover:bg-destructive/10" },
   { grade: "hard", label: "Difficile", icon: Dumbbell, tone: "border-warning/30 text-warning hover:bg-warning/10" },
-  { grade: "good", label: "Bien", icon: ThumbsUp, tone: "border-ring/30 text-ring hover:bg-ring/10" },
+  { grade: "good", label: "Bien", icon: ThumbsUp, tone: "border-accent-brand/30 text-accent-brand hover:bg-accent-brand/10" },
   { grade: "easy", label: "Facile", icon: Star, tone: "border-success/30 text-success hover:bg-success/10" },
 ]
 
@@ -236,7 +236,7 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
         </div>
         <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
           <div
-            className="h-full bg-ring transition-all duration-300 ease-out rounded-full"
+            className="h-full bg-accent-brand transition-all duration-300 ease-out rounded-full"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -263,7 +263,7 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
           {/* Front */}
           <Card
             ref={frontRef}
-            className="absolute inset-0 h-full min-h-44 border border-border/70 bg-card shadow-none hover:border-ring/40"
+            className="absolute inset-0 h-full min-h-44 border border-border/70 bg-card shadow-none hover:border-accent-brand/40"
             style={{ backfaceVisibility: "hidden" }}
           >
             <CardContent className="flex min-h-44 flex-col items-center justify-center gap-4 p-6 text-center">
@@ -275,7 +275,7 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
           {/* Back */}
           <Card
             ref={backRef}
-            className="absolute inset-0 h-full min-h-44 border border-ring/40 bg-ring/5 shadow-none"
+            className="absolute inset-0 h-full min-h-44 border border-accent-brand/40 bg-accent-brand/5 shadow-none"
             style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
           >
             <CardContent className="flex min-h-44 flex-col items-center justify-center gap-4 p-6 text-center">

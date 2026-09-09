@@ -141,7 +141,7 @@ export function BugHunt({ chapter, onComplete }: Props) {
                     "flex w-full items-start gap-3 whitespace-pre px-3 py-1.5 text-left transition-colors",
                     isWrong && "animate-shake-wrong",
                     isFound && "animate-in fade-in zoom-in-95 duration-300",
-                    isClickable && !isWrong && "cursor-pointer hover:bg-ring/10",
+                    isClickable && !isWrong && "cursor-pointer hover:bg-accent-brand/10",
                     isWrong && "bg-destructive/10 text-destructive line-through decoration-destructive/50",
                     isFound && "bg-success/10 text-success font-medium",
                     !isWrong && !isFound && "text-foreground",
@@ -170,12 +170,12 @@ export function BugHunt({ chapter, onComplete }: Props) {
             <div className="flex items-center gap-3">
               <div className={cn(
                 "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full",
-                wrongGuesses.length === 0 ? "bg-success/10" : "bg-ring/10",
+                wrongGuesses.length === 0 ? "bg-success/10" : "bg-accent-brand/10",
               )}>
                 {wrongGuesses.length === 0 ? (
                   <Trophy className="h-6 w-6 text-success" />
                 ) : (
-                  <CheckCircle2 className="h-6 w-6 text-ring" />
+                  <CheckCircle2 className="h-6 w-6 text-accent-brand" />
                 )}
               </div>
               <div>

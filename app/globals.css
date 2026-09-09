@@ -83,6 +83,15 @@
   --success-foreground: #ffffff;
   --warning:            #ffae00; /* amber-700 */
   --warning-foreground: #171717; /* dark text — amber is light */
+
+  /* Couleur de marque it-learn — distincte de --ring (focus, accessibilité).
+     --ring reste réservé au focus visible ; --accent-brand est la seule
+     couleur qui porte l'identité visuelle propre à l'app (badges "en
+     cours", CTA de célébration, accents décoratifs). Migration prévue
+     progressivement des usages historiques de --ring-comme-accent vers ce
+     token — voir docs/design-audit-identite-visuelle.md. */
+  --accent-brand:            #6d5ef5; /* violet — direction "C" validée par Ricky */
+  --accent-brand-foreground: #ffffff;
 }
 
 .dark {
@@ -158,6 +167,12 @@
   --success-foreground: #000000;
   --warning:            #ffae00; /* amber-700 dark */
   --warning-foreground: #000000;
+
+  /* Couleur de marque it-learn — voir le commentaire sur .root pour le
+     rôle. Légèrement éclairci par rapport au light pour rester lisible
+     sur fond noir pur, même logique que --ring en dark. */
+  --accent-brand:            #8b7bff;
+  --accent-brand-foreground: #000000;
 }
 
 @theme inline {
@@ -225,6 +240,8 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning:            var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-accent-brand:            var(--accent-brand);
+  --color-accent-brand-foreground: var(--accent-brand-foreground);
 }
 
 @layer base {

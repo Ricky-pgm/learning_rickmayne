@@ -56,7 +56,7 @@ export function TimeRing({ estimate, phasesDone, className }: Props) {
             strokeDashoffset={dashOffset}
             className={cn(
               "transition-[stroke-dashoffset] duration-700 ease-out",
-              done ? "stroke-success" : "stroke-ring",
+              done ? "stroke-success" : "stroke-accent-brand",
             )}
           />
         </svg>

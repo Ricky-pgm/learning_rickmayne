@@ -355,7 +355,7 @@ export function ConceptMap({ chapter, onComplete }: Props) {
                 <line
                   x1={positions[selected]?.x} y1={positions[selected]?.y}
                   x2={positions[selected]?.x} y2={positions[selected]?.y}
-                  className="stroke-ring"
+                  className="stroke-accent-brand"
                 />
               )}
             </svg>
@@ -372,9 +372,9 @@ export function ConceptMap({ chapter, onComplete }: Props) {
                   style={{ left: `${pos.x}%`, top: `${pos.y}%`, maxWidth: nodeMaxWidthPx }}
                   className={cn(
                     "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-2.5 py-1.5 text-center text-[11px] font-medium leading-tight transition-all sm:text-xs",
-                    isSelected && "scale-105 border-ring bg-ring/15 text-ring shadow-sm",
+                    isSelected && "scale-105 border-accent-brand bg-accent-brand/15 text-accent-brand shadow-sm",
                     !isSelected && isConnected && "border-success/40 bg-success/10 text-success",
-                    !isSelected && !isConnected && "border-border bg-card hover:border-ring/40 hover:bg-muted/40",
+                    !isSelected && !isConnected && "border-border bg-card hover:border-accent-brand/40 hover:bg-muted/40",
                   )}
                 >
                   {node}
@@ -396,12 +396,12 @@ export function ConceptMap({ chapter, onComplete }: Props) {
           <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
             <div className={cn(
               "flex h-14 w-14 items-center justify-center rounded-full",
-              attempts === totalEdges ? "bg-success/10" : "bg-ring/10",
+              attempts === totalEdges ? "bg-success/10" : "bg-accent-brand/10",
             )}>
               {attempts === totalEdges ? (
                 <Trophy className="h-7 w-7 text-success" />
               ) : (
-                <CheckCircle2 className="h-7 w-7 text-ring" />
+                <CheckCircle2 className="h-7 w-7 text-accent-brand" />
               )}
             </div>
             <div>

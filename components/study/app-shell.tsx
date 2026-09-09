@@ -88,7 +88,7 @@ export function AppShell({ children }: Props) {
         href="/etude"
         className={cn(
           "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-          isToday ? "bg-ring/10 text-ring" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          isToday ? "bg-accent-brand/10 text-accent-brand" : "text-muted-foreground hover:bg-muted hover:text-foreground"
         )}
       >
         <Clock className="h-4 w-4 flex-shrink-0" />
@@ -98,7 +98,7 @@ export function AppShell({ children }: Props) {
         href="/etude/dashboard"
         className={cn(
           "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-          isManage ? "bg-ring/10 text-ring" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          isManage ? "bg-accent-brand/10 text-accent-brand" : "text-muted-foreground hover:bg-muted hover:text-foreground"
         )}
       >
         <FolderKanban className="h-4 w-4 flex-shrink-0" />
@@ -149,7 +149,7 @@ export function AppShell({ children }: Props) {
         className="flex w-full items-center gap-2.5 rounded-md p-1.5 text-left transition-colors hover:bg-muted"
       >
         <div className="relative flex-shrink-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-ring to-success text-[11px] font-bold text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent-brand to-success text-[11px] font-bold text-white">
             {initialsFromEmail(user?.email)}
           </div>
           <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-success" />
@@ -179,7 +179,7 @@ export function AppShell({ children }: Props) {
           <Menu className="h-4 w-4" />
         </button>
         <span className="font-semibold">{pageTitle}</span>
-        <div className="ml-auto flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ring to-success text-[10px] font-bold text-white">
+        <div className="ml-auto flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent-brand to-success text-[10px] font-bold text-white">
           {initialsFromEmail(user?.email)}
         </div>
       </div>
@@ -201,7 +201,7 @@ export function AppShell({ children }: Props) {
         )}
       >
         <div className="flex items-center gap-2.5 px-3.5 py-4">
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-ring text-white">
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-accent-brand text-white">
             <GraduationCap className="h-4 w-4" />
           </div>
           <div>

@@ -203,7 +203,7 @@ export default function EtudeDashboardManager() {
       </Link>
 
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Gérer mes cours</h1>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">Gérer mes cours</h1>
         <p className="text-muted-foreground mt-1">Crée, importe et organise tes contenus d&apos;étude.</p>
       </div>
 
@@ -253,8 +253,8 @@ export default function EtudeDashboardManager() {
                   className={cn(
                     "group relative overflow-hidden rounded-lg border p-3 text-left transition-all",
                     newProfile === key
-                      ? "border-ring bg-ring/10 shadow-sm"
-                      : "border-border/70 hover:border-ring/40 hover:bg-muted/40",
+                      ? "border-accent-brand bg-accent-brand/10 shadow-sm"
+                      : "border-border/70 hover:border-accent-brand/40 hover:bg-muted/40",
                   )}
                 >
                   {/* Pastille de couleur du profil plutôt qu'un simple
@@ -263,7 +263,7 @@ export default function EtudeDashboardManager() {
                       sur ChapterCard — un même code couleur traverse toute
                       l'app plutôt que de s'arrêter à cet écran. */}
                   <span className={cn("absolute right-2 top-2 h-1.5 w-1.5 rounded-full transition-transform", dotColor, newProfile === key ? "scale-125" : "scale-100 opacity-50")} />
-                  <Icon className={cn("h-5 w-5 transition-colors", newProfile === key ? "text-ring" : "text-muted-foreground")} />
+                  <Icon className={cn("h-5 w-5 transition-colors", newProfile === key ? "text-accent-brand" : "text-muted-foreground")} />
                   <p className="text-sm font-medium mt-1">{label}</p>
                   {/* Masquée sur mobile plutôt que wrap sur 3-4 lignes en
                       text-xs — à 3 colonnes sur ~375px, ça donnait 3
@@ -322,7 +322,7 @@ export default function EtudeDashboardManager() {
                 <Card
                   className={cn(
                     "overflow-hidden border bg-card p-0 shadow-none transition-all cursor-pointer",
-                    isSelected ? "border-ring shadow-sm" : "border-border/70 hover:border-ring/40",
+                    isSelected ? "border-accent-brand shadow-sm" : "border-border/70 hover:border-accent-brand/40",
                   )}
                   onClick={() => setSelectedCourse(isSelected ? null : course)}
                 >
@@ -369,7 +369,7 @@ export default function EtudeDashboardManager() {
                     simple retrait indenté, cohérent avec le traitement
                     "phase" du reste de l'app (fond + bordure teintés). */}
                 {isSelected && (
-                  <div className="animate-in fade-in slide-in-from-top-1 mt-2 space-y-4 rounded-lg border border-ring/20 bg-ring/[0.03] p-4 duration-200">
+                  <div className="animate-in fade-in slide-in-from-top-1 mt-2 space-y-4 rounded-lg border border-accent-brand/20 bg-accent-brand/[0.03] p-4 duration-200">
                     {/* Date d'examen + export du planning de révision —
                         saisie manuelle (voir docs/db-anpassung.md §3ter),
                         pas d'extraction automatique depuis un planning
@@ -420,11 +420,11 @@ export default function EtudeDashboardManager() {
                       className={cn(
                         "relative flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center transition-all",
                         dragging
-                          ? "scale-[1.01] border-ring bg-ring/10"
-                          : "border-border/50 bg-card hover:border-ring/40 hover:bg-muted/20",
+                          ? "scale-[1.01] border-accent-brand bg-accent-brand/10"
+                          : "border-border/50 bg-card hover:border-accent-brand/40 hover:bg-muted/20",
                       )}
                     >
-                      <FileUp className={cn("h-8 w-8 transition-transform", dragging ? "scale-110 text-ring" : "text-muted-foreground/50")} />
+                      <FileUp className={cn("h-8 w-8 transition-transform", dragging ? "scale-110 text-accent-brand" : "text-muted-foreground/50")} />
                       <p className="text-sm text-muted-foreground">
                         {uploading ? (
                           <span className="flex items-center gap-2"><Spinner className="size-4" /> Importation…</span>
@@ -433,7 +433,7 @@ export default function EtudeDashboardManager() {
                         )}
                       </p>
                       {!uploading && (
-                        <label className="cursor-pointer text-sm font-medium text-ring hover:underline">
+                        <label className="cursor-pointer text-sm font-medium text-accent-brand hover:underline">
                           parcourir
                           <input
                             type="file"

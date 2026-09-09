@@ -162,13 +162,13 @@ export function MemoryMatch({ chapter, onComplete }: Props) {
     const isEfficient = moves <= totalPairs + 2
 
     return (
-      <Card className="border border-ring/30 bg-ring/5 shadow-none">
+      <Card className="border border-accent-brand/30 bg-accent-brand/5 shadow-none">
         <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
           <div className={cn(
             "flex h-16 w-16 items-center justify-center rounded-full",
-            isEfficient ? "bg-success/10" : "bg-ring/10",
+            isEfficient ? "bg-success/10" : "bg-accent-brand/10",
           )}>
-            {isEfficient ? <Trophy className="h-8 w-8 text-success" /> : <Brain className="h-8 w-8 text-ring" />}
+            {isEfficient ? <Trophy className="h-8 w-8 text-success" /> : <Brain className="h-8 w-8 text-accent-brand" />}
           </div>
           <div>
             <p className="text-xl font-semibold">
@@ -218,7 +218,7 @@ export function MemoryMatch({ chapter, onComplete }: Props) {
               >
                 {/* Back (hidden face) */}
                 <div
-                  className="absolute inset-0 flex items-center justify-center rounded-lg border border-border/70 bg-gradient-to-br from-muted/60 to-muted/30 hover:border-ring/40"
+                  className="absolute inset-0 flex items-center justify-center rounded-lg border border-border/70 bg-gradient-to-br from-muted/60 to-muted/30 hover:border-accent-brand/40"
                   style={{ backfaceVisibility: "hidden" }}
                 >
                   <Brain className="h-5 w-5 text-muted-foreground/40" />
@@ -230,7 +230,7 @@ export function MemoryMatch({ chapter, onComplete }: Props) {
                     "absolute inset-0 flex items-center justify-center rounded-lg border p-1.5 text-center text-[11px] leading-tight font-medium transition-colors sm:text-xs",
                     isWrong && "animate-shake-wrong border-destructive/50 bg-destructive/10 text-destructive",
                     isMatched && "animate-in zoom-in-90 border-success/50 bg-success/10 text-success duration-300",
-                    !isWrong && !isMatched && "border-ring/40 bg-ring/5",
+                    !isWrong && !isMatched && "border-accent-brand/40 bg-accent-brand/5",
                   )}
                   style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
                 >

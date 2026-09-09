@@ -187,16 +187,16 @@ export function SpeedRound({ chapter, lang, onComplete }: Props) {
     const isPerfect = correctCount === questions.length
 
     return (
-      <Card className="border border-ring/30 bg-ring/5 shadow-none">
+      <Card className="border border-accent-brand/30 bg-accent-brand/5 shadow-none">
         <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
           <div className={cn(
             "flex h-16 w-16 items-center justify-center rounded-full",
-            isPerfect ? "bg-success/10" : "bg-ring/10",
+            isPerfect ? "bg-success/10" : "bg-accent-brand/10",
           )}>
             {isPerfect ? (
               <Trophy className="h-8 w-8 text-success" />
             ) : (
-              <Zap className="h-8 w-8 text-ring" />
+              <Zap className="h-8 w-8 text-accent-brand" />
             )}
           </div>
 
@@ -274,7 +274,7 @@ export function SpeedRound({ chapter, lang, onComplete }: Props) {
           <div
             className={cn(
               "h-full rounded-full transition-all duration-1000 ease-linear",
-              isLowTime ? "bg-destructive" : "bg-ring",
+              isLowTime ? "bg-destructive" : "bg-accent-brand",
             )}
             style={{ width: `${timerProgress}%` }}
           />
@@ -307,7 +307,7 @@ export function SpeedRound({ chapter, lang, onComplete }: Props) {
                   disabled={revealed}
                   className={cn(
                     "rounded-lg border px-3 py-2.5 text-left text-sm transition-all duration-200",
-                    !revealed && "border-border hover:border-ring/40 hover:bg-muted/40",
+                    !revealed && "border-border hover:border-accent-brand/40 hover:bg-muted/40",
                     revealed && isCorrect && "scale-[1.02] border-success/40 bg-success/10 text-success font-medium shadow-sm",
                     revealed && isSelected && !isCorrect && "border-destructive/40 bg-destructive/10 text-destructive",
                     revealed && !isCorrect && !isSelected && "border-border/50 opacity-50",

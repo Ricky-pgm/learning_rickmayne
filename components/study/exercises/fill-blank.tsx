@@ -220,8 +220,8 @@ export function FillBlank({ chapter, onComplete }: Props) {
                     // Avant vérification : un trou rempli reste neutre
                     // (pas de vert/rouge prématuré) — juste rempli ou pas,
                     // et re-cliquable pour changer d'avis.
-                    !checked && filled && "cursor-pointer border-ring/40 bg-ring/5 text-foreground hover:border-destructive/40 hover:bg-destructive/5",
-                    !checked && !filled && selectedTag && "cursor-pointer border-ring/50 bg-ring/5 text-ring hover:bg-ring/10",
+                    !checked && filled && "cursor-pointer border-accent-brand/40 bg-accent-brand/5 text-foreground hover:border-destructive/40 hover:bg-destructive/5",
+                    !checked && !filled && selectedTag && "cursor-pointer border-accent-brand/50 bg-accent-brand/5 text-accent-brand hover:bg-accent-brand/10",
                     !checked && !filled && !selectedTag && "border-dashed border-border text-muted-foreground",
                     isCorrect && "border-success/40 bg-success/10 text-success",
                     isIncorrect && "border-destructive/50 bg-destructive/10 text-destructive",
@@ -246,8 +246,8 @@ export function FillBlank({ chapter, onComplete }: Props) {
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
                   selectedTag === tag
-                    ? "scale-105 border-ring bg-ring/15 text-ring shadow-sm"
-                    : "border-border bg-card hover:border-ring/40 hover:bg-muted/40",
+                    ? "scale-105 border-accent-brand bg-accent-brand/15 text-accent-brand shadow-sm"
+                    : "border-border bg-card hover:border-accent-brand/40 hover:bg-muted/40",
                 )}
               >
                 {tag}

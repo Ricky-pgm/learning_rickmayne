@@ -191,14 +191,14 @@ export default function EtudeCoursePage() {
       </Link>
 
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-ring/10 text-ring">
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-accent-brand/10 text-accent-brand">
           {(() => {
             const Icon = PROFILE_UI[course.profile].icon
             return <Icon className="h-5 w-5" />
           })()}
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{course.title}</h1>
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{course.title}</h1>
           <p className="text-sm text-muted-foreground">
             {chapters.length} chapitre{chapters.length !== 1 ? "s" : ""}
           </p>
@@ -276,6 +276,30 @@ export default function EtudeCoursePage() {
       {/* Chapitres générés */}
       {chapters.length > 0 ? (
         <section className="space-y-3">
+          {/* Frise de progression : donne le "où j'en suis" d'un coup
+              d'œil, là où 41 lignes identiques triées uniquement par
+              ordre ne permettent de le voir qu'en scrollant tout —
+              un segment par chapitre de contenu (jamais organisationnel,
+              qui n'a pas d'état de maîtrise). */}
+          <div className="flex gap-1">
+            {contentChapters
+              .slice()
+              .sort((a, b) => a.order - b.order)
+              .map(ch => {
+                const isDue = ch.next_review !== null && new Date(ch.next_review) <= new Date()
+                const isMastered = ch.mastery_pct === 100
+                return (
+                  <div
+                    key={ch.id}
+                    title={ch.title}
+                    className={cn(
+                      "h-1.5 flex-1 rounded-full",
+                      isDue ? "bg-warning" : isMastered ? "bg-success" : ch.mastery_pct > 0 ? "bg-accent-brand" : "bg-muted",
+                    )}
+                  />
+                )
+              })}
+          </div>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               Chapitres
@@ -285,8 +309,38 @@ export default function EtudeCoursePage() {
               {dueCount > 0 && <span className="text-warning"> · {dueCount} à réviser</span>}
             </p>
           </div>
+
+          {/* Chapitres organisationnels (plan de semestre, modalités
+              d'examen...) : sortis de la liste numérotée de contenu
+              plutôt que mélangés dans le flux — ce ne sont pas des
+              chapitres à réviser, les mélanger fait sauter la
+              numérotation du vrai contenu sans raison. */}
+          {chapters.some(ch => ch.is_organizational) && (
+            <div className="space-y-2 rounded-lg border border-dashed border-accent-brand/30 bg-accent-brand/[0.03] p-3">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Info className="h-3.5 w-3.5" /> Infos du cours
+              </p>
+              {chapters
+                .filter(ch => ch.is_organizational)
+                .sort((a, b) => a.order - b.order)
+                .map(ch => (
+                  <Link key={ch.id} href={`/etude/${courseId}/kapitel/${ch.id}`}>
+                    <Card className="overflow-hidden border border-border/60 bg-card p-0 shadow-none transition-colors hover:border-accent-brand/40 cursor-pointer">
+                      <CardContent className="flex min-w-0 items-center gap-3 p-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{ch.title}</p>
+                          <p className="truncate text-xs text-muted-foreground">{ch.summary}</p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+            </div>
+          )}
+
           <div className="space-y-2">
-            {chapters
+            {contentChapters
               .slice()
               .sort((a, b) => a.order - b.order)
               .map(ch => {
@@ -295,20 +349,15 @@ export default function EtudeCoursePage() {
                 const timeEstimate = estimateChapterTime(ch.concepts.length, ch.profile, ch.has_code)
                 return (
                   <Link key={ch.id} href={`/etude/${courseId}/kapitel/${ch.id}`}>
-                    <Card className="overflow-hidden border border-border/70 bg-card p-0 shadow-none transition-all hover:border-ring/40 hover:shadow-sm cursor-pointer">
+                    <Card className="overflow-hidden border border-border/70 bg-card p-0 shadow-none transition-all hover:border-accent-brand/40 hover:shadow-sm cursor-pointer">
                       <CardContent className="flex items-stretch gap-0 p-0">
                         {/* Bande d'état : lisible d'un coup d'œil sur une
                             liste longue (58 chapitres sur un cours réel),
-                            là où un pourcentage seul se noie. Neutre pour
-                            un chapitre organisationnel — il n'a pas
-                            d'état de maîtrise, ce n'est pas du contenu à
-                            réviser. */}
+                            là où un pourcentage seul se noie. */}
                         <div
                           className={cn(
                             "w-1 flex-shrink-0",
-                            ch.is_organizational
-                              ? "bg-muted-foreground/20"
-                              : isDue ? "bg-warning" : isMastered ? "bg-success" : ch.mastery_pct > 0 ? "bg-ring" : "bg-border",
+                            isDue ? "bg-warning" : isMastered ? "bg-success" : ch.mastery_pct > 0 ? "bg-accent-brand" : "bg-border",
                           )}
                         />
                         <div className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3 sm:px-4">
@@ -318,34 +367,26 @@ export default function EtudeCoursePage() {
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <p className="truncate text-sm font-medium">{ch.title}</p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {ch.is_organizational ? ch.summary : ch.concepts.slice(0, 3).join(" · ")}
+                              {ch.concepts.slice(0, 3).join(" · ")}
                             </p>
-                            {!ch.is_organizational && ch.mastery_pct > 0 && (
+                            {ch.mastery_pct > 0 && (
                               <div className="h-1 w-full max-w-40 overflow-hidden rounded-full bg-muted">
                                 <div
-                                  className={cn("h-full rounded-full", isMastered ? "bg-success" : "bg-ring")}
+                                  className={cn("h-full rounded-full", isMastered ? "bg-success" : "bg-accent-brand")}
                                   style={{ width: `${ch.mastery_pct}%` }}
                                 />
                               </div>
                             )}
                           </div>
-                          {ch.is_organizational ? (
-                            <Badge variant="outline" className="flex-shrink-0 text-xs text-muted-foreground">
-                              <Info className="h-3 w-3" /> Info
+                          {isDue && (
+                            <Badge variant="outline" className="flex-shrink-0 border-warning/40 text-xs text-warning">
+                              À réviser
                             </Badge>
-                          ) : (
-                            <>
-                              {isDue && (
-                                <Badge variant="outline" className="flex-shrink-0 border-warning/40 text-xs text-warning">
-                                  À réviser
-                                </Badge>
-                              )}
-                              {!isMastered && (
-                                <span className="hidden flex-shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
-                                  <Clock className="h-3 w-3" /> ~{timeEstimate.totalMinutes} min
-                                </span>
-                              )}
-                            </>
+                          )}
+                          {!isMastered && (
+                            <span className="hidden flex-shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
+                              <Clock className="h-3 w-3" /> ~{timeEstimate.totalMinutes} min
+                            </span>
                           )}
                           <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                         </div>
@@ -359,12 +400,12 @@ export default function EtudeCoursePage() {
       ) : pendingFiles.length === 0 ? (
         <Card className="border-dashed border-2 border-muted-foreground/20 bg-muted/10">
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ring/10">
-              <BookOpen className="h-5 w-5 text-ring" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-brand/10">
+              <BookOpen className="h-5 w-5 text-accent-brand" />
             </div>
             <p className="text-sm text-muted-foreground max-w-sm">
               Aucun fichier importé pour ce cours. Ajoute un PDF depuis la page{" "}
-              <Link href="/etude/dashboard" className="text-ring hover:underline">
+              <Link href="/etude/dashboard" className="text-accent-brand hover:underline">
                 Gérer mes cours
               </Link>{" "}
               pour générer les premiers chapitres.

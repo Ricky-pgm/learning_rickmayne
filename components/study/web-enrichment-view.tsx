@@ -67,8 +67,8 @@ export function WebEnrichmentView({ chapter }: Props) {
     <Collapsible open={open} onOpenChange={setOpen} className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-none">
       <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/30">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-ring/10">
-            <Globe className="h-5 w-5 text-ring" />
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-accent-brand/10">
+            <Globe className="h-5 w-5 text-accent-brand" />
           </div>
           <div className="min-w-0">
             <p className="text-lg font-semibold">Pour aller plus loin</p>
@@ -120,14 +120,14 @@ export function WebEnrichmentView({ chapter }: Props) {
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block rounded-lg border border-border/70 p-3.5 transition-colors hover:border-ring/40 hover:bg-muted/30"
+                className="block rounded-lg border border-border/70 p-3.5 transition-colors hover:border-accent-brand/40 hover:bg-muted/30"
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-medium text-sm">{source.title}</p>
                   <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground mt-0.5" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{source.summary_fr}</p>
-                <p className="text-xs text-ring/70 mt-1.5 truncate">{source.url}</p>
+                <p className="text-xs text-accent-brand/70 mt-1.5 truncate">{source.url}</p>
               </a>
             ))}
             <Button variant="outline" size="sm" className="gap-2" onClick={search}>

@@ -213,11 +213,11 @@ export default function EtudeDashboardPage() {
   if (chapters.length === 0) {
     return (
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-8">Étude</h1>
+        <h1 className="font-heading text-3xl font-bold tracking-tight mb-8">Étude</h1>
         <Card className="border-dashed border-2 border-muted-foreground/20 bg-muted/10">
           <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-ring/10">
-              <BookOpen className="h-6 w-6 text-ring" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-brand/10">
+              <BookOpen className="h-6 w-6 text-accent-brand" />
             </div>
             {hasCourses ? (
               <div className="space-y-1">
@@ -252,7 +252,7 @@ export default function EtudeDashboardPage() {
       {/* Header with streak & progress */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Aujourd&apos;hui</h1>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">Aujourd&apos;hui</h1>
           <p className="text-muted-foreground mt-1">
             {dueChapters.length > 0
               ? `${dueChapters.length} carte${dueChapters.length > 1 ? "s" : ""} à réviser`
@@ -282,13 +282,13 @@ export default function EtudeDashboardPage() {
         // l'écart doit être sans ambiguïté entre la recommandation et les
         // stats qui suivent.
         <Link href={`/etude/${priorityChapter.study_course_id}/kapitel/${priorityChapter.id}`} className="block mb-10">
-          <Card className="group/reco relative overflow-hidden border border-ring/20 bg-gradient-to-br from-ring/10 via-ring/5 to-transparent shadow-none transition-all hover:border-ring/40 hover:shadow-md hover:shadow-ring/5 cursor-pointer">
+          <Card className="group/reco relative overflow-hidden border border-accent-brand/20 bg-gradient-to-br from-accent-brand/10 via-accent-brand/5 to-transparent shadow-none transition-all hover:border-accent-brand/40 hover:shadow-md hover:shadow-accent-brand/5 cursor-pointer">
             <CardContent className="flex items-center gap-3.5 p-4 sm:p-5">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-ring/15 text-ring transition-transform group-hover/reco:scale-105 group-hover/reco:rotate-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent-brand/15 text-accent-brand transition-transform group-hover/reco:scale-105 group-hover/reco:rotate-3">
                 <Sparkles className="h-4.5 w-4.5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ring/80">Recommandé pour toi</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-accent-brand/80">Recommandé pour toi</p>
                 {/* truncate sur un span inline ne coupe rien tant que le
                     <p> parent n'a pas lui-même une largeur contrainte —
                     sur mobile avec un titre de chapitre long, ça débordait
@@ -319,10 +319,10 @@ export default function EtudeDashboardPage() {
           tone="success"
         />
         <StatCard
-          icon={<Zap className="h-5 w-5 text-ring" />}
+          icon={<Zap className="h-5 w-5 text-accent-brand" />}
           label="Moy. maîtrise"
           value={`${totalMastery}%`}
-          tone="ring"
+          tone="brand"
         />
         <StatCard
           icon={<Clock className="h-5 w-5 text-warning" />}
@@ -356,10 +356,10 @@ export default function EtudeDashboardPage() {
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 [animation-delay:75ms] fill-mode-both">
           <DashboardSection
             title="En cours"
-            icon={<Zap className="h-4 w-4 text-ring" />}
+            icon={<Zap className="h-4 w-4 text-accent-brand" />}
             count={inProgress.length}
             shown={Math.min(inProgress.length, 5)}
-            tone="ring"
+            tone="brand"
           >
             {inProgress.slice(0, 5).map(ch => (
               <ChapterCard key={ch.id} chapter={ch} />
@@ -389,7 +389,7 @@ export default function EtudeDashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {courseSummaries.map(s => (
               <Link key={s.courseId} href={`/etude/${s.courseId}`}>
-                <Card className="border border-border/70 bg-card shadow-none transition-colors hover:border-ring/40 cursor-pointer h-full">
+                <Card className="border border-border/70 bg-card shadow-none transition-colors hover:border-accent-brand/40 cursor-pointer h-full">
                   <CardContent className="p-4">
                     <p className="font-semibold truncate">{s.title}</p>
                     <p className="text-sm text-muted-foreground mt-1">
@@ -412,12 +412,12 @@ function StatCard({ icon, label, value, tone }: {
   icon: React.ReactNode
   label: string
   value: number | string
-  tone: "default" | "success" | "ring" | "warning"
+  tone: "default" | "success" | "brand" | "warning"
 }) {
   const bg: Record<string, string> = {
     default: "bg-muted/40",
     success: "bg-success/10",
-    ring: "bg-ring/10",
+    brand: "bg-accent-brand/10",
     warning: "bg-warning/10",
   }
   return (
@@ -460,14 +460,14 @@ function DashboardSection({
    * — sans lui, le badge affichait le total (ex. 58) alors que seules 5
    * cartes sont listées, ce qui semblait faux au premier coup d'œil. */
   shown: number
-  tone: "warning" | "ring" | "default"
+  tone: "warning" | "brand" | "default"
   children: React.ReactNode
 }) {
   if (count === 0) return null
 
   const toneClasses: Record<typeof tone, string> = {
     warning: "border-warning/20 bg-warning/[0.03]",
-    ring: "border-ring/20 bg-ring/[0.03]",
+    brand: "border-accent-brand/20 bg-accent-brand/[0.03]",
     default: "border-border/60 bg-muted/10",
   }
 
@@ -495,13 +495,13 @@ function ChapterCard({
 }) {
   return (
     <Link href={`/etude/${chapter.study_course_id}/kapitel/${chapter.id}`}>
-      <Card className="overflow-hidden border border-border/70 bg-card shadow-none transition-all hover:border-ring/40 hover:shadow-sm cursor-pointer p-0">
+      <Card className="overflow-hidden border border-border/70 bg-card shadow-none transition-all hover:border-accent-brand/40 hover:shadow-sm cursor-pointer p-0">
         <CardContent className="flex items-stretch gap-0 p-0">
           {/* Bande de catégorie — encode l'état d'un coup d'œil, avant
               même de lire le badge texte. */}
           <div className={cn(
             "w-1 flex-shrink-0",
-            showDue ? "bg-warning" : showNew ? "bg-ring" : "bg-border",
+            showDue ? "bg-warning" : showNew ? "bg-accent-brand" : "bg-border",
           )} />
           <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3.5 py-3 sm:px-4">
             <div className="min-w-0 flex-1">
@@ -517,7 +517,7 @@ function ChapterCard({
                 </Badge>
               )}
               {showNew && (
-                <Badge variant="outline" className="text-xs border-ring/40 text-ring">
+                <Badge variant="outline" className="text-xs border-accent-brand/40 text-accent-brand">
                   Nouveau
                 </Badge>
               )}

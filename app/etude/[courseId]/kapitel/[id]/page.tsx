@@ -198,7 +198,7 @@ export default function StudyChapterPage({
               <Badge variant="secondary" className="text-xs">{profileLabel}</Badge>
               <Badge variant="outline" className="text-xs">Chapitre {positionInCourse}/{totalChapters}</Badge>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-balance">{chapter.title}</h1>
+            <h1 className="font-heading text-3xl font-bold tracking-tight text-balance">{chapter.title}</h1>
           </div>
           {/* Pas de temps à estimer pour un chapitre organisationnel — ce
               n'est pas du contenu à réviser (voir docs/db-anpassung.md §6bis). */}
@@ -230,7 +230,7 @@ export default function StudyChapterPage({
         step={1}
         title="Comprendre"
         subtitle="Le contenu du chapitre, expliqué et approfondi"
-        tone="ring"
+        tone="brand"
         done={lessonOpened}
       >
         {chapter.concepts.length > 0 && (
@@ -243,7 +243,7 @@ export default function StudyChapterPage({
                 <Badge
                   key={c}
                   variant="outline"
-                  className="text-xs border-ring/30 text-ring transition-colors hover:bg-ring/10"
+                  className="text-xs border-accent-brand/30 text-accent-brand transition-colors hover:bg-accent-brand/10"
                 >
                   {c}
                 </Badge>

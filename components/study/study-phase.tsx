@@ -7,7 +7,7 @@ interface Props {
   step: number
   title: string
   subtitle: string
-  tone: "ring" | "warning" | "success"
+  tone: "brand" | "warning" | "success"
   /** Phase entamée/terminée par l'étudiant — remplace le numéro par une
    * coche et allume le trait. Sans ce signal la page ne rendait aucun
    * sentiment d'avancement pendant la session : les trois phases avaient
@@ -17,7 +17,7 @@ interface Props {
 }
 
 const TONE: Record<Props["tone"], { badge: string; badgeDone: string; rule: string; ruleDone: string }> = {
-  ring: { badge: "bg-ring/12 text-ring", badgeDone: "bg-ring text-primary-foreground", rule: "bg-ring/25", ruleDone: "bg-ring/70" },
+  brand: { badge: "bg-accent-brand/12 text-accent-brand", badgeDone: "bg-accent-brand text-primary-foreground", rule: "bg-accent-brand/25", ruleDone: "bg-accent-brand/70" },
   warning: { badge: "bg-warning/12 text-warning", badgeDone: "bg-warning text-warning-foreground", rule: "bg-warning/25", ruleDone: "bg-warning/70" },
   success: { badge: "bg-success/12 text-success", badgeDone: "bg-success text-success-foreground", rule: "bg-success/25", ruleDone: "bg-success/70" },
 }

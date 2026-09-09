@@ -118,11 +118,11 @@ export function CodeComplete({ chapter, onComplete }: Props) {
                 <span className="flex-1">{line}</span>
               </div>
             ))}
-            <div className="flex items-start gap-3 whitespace-pre bg-ring/5 px-3 py-1.5">
+            <div className="flex items-start gap-3 whitespace-pre bg-accent-brand/5 px-3 py-1.5">
               <span className="select-none text-muted-foreground/40 tabular-nums">{challenge.code_before.length + 1}</span>
               <span className={cn(
                 "flex-1 font-medium",
-                solved ? "animate-in fade-in zoom-in-95 text-success duration-300" : "text-ring",
+                solved ? "animate-in fade-in zoom-in-95 text-success duration-300" : "text-accent-brand",
               )}>
                 {solved ? challenge.options[challenge.correct_index] : "// ?"}
               </span>
@@ -152,7 +152,7 @@ export function CodeComplete({ chapter, onComplete }: Props) {
                   "rounded-lg border px-3 py-2.5 text-left font-mono text-xs transition-all sm:text-sm",
                   isWrong
                     ? "animate-shake-wrong border-destructive/40 bg-destructive/10 text-destructive line-through decoration-destructive/50"
-                    : "border-border hover:border-ring/40 hover:bg-muted/40",
+                    : "border-border hover:border-accent-brand/40 hover:bg-muted/40",
                 )}
               >
                 <span className="flex items-center gap-2">
@@ -171,12 +171,12 @@ export function CodeComplete({ chapter, onComplete }: Props) {
             <div className="flex items-center gap-3">
               <div className={cn(
                 "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full",
-                wrongIndices.length === 0 ? "bg-success/10" : "bg-ring/10",
+                wrongIndices.length === 0 ? "bg-success/10" : "bg-accent-brand/10",
               )}>
                 {wrongIndices.length === 0 ? (
                   <Trophy className="h-6 w-6 text-success" />
                 ) : (
-                  <CheckCircle2 className="h-6 w-6 text-ring" />
+                  <CheckCircle2 className="h-6 w-6 text-accent-brand" />
                 )}
               </div>
               <div>

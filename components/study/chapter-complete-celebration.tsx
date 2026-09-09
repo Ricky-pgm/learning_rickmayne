@@ -15,7 +15,7 @@ interface Props {
   nextChapterTitle: string | null
 }
 
-const CONFETTI_COLORS = ["bg-ring", "bg-success", "bg-warning", "bg-destructive"]
+const CONFETTI_COLORS = ["bg-accent-brand", "bg-success", "bg-warning", "bg-destructive"]
 
 /**
  * Célébration au moment où les 3 phases d'un chapitre (Comprendre /
@@ -70,7 +70,7 @@ export function ChapterCompleteCelebration({ open, onClose, chapterTitle, nextHr
             }
           `}</style>
 
-          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-success to-ring text-white shadow-lg">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-success to-accent-brand text-white shadow-lg">
             <PartyPopper className="h-8 w-8" />
           </div>
           <DialogTitle className="relative text-xl font-bold">Chapitre terminé !</DialogTitle>
