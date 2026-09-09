@@ -391,7 +391,14 @@ un vrai travail effectué dans n'importe quel mode compte, sans forcer
 personne à passer par les flashcards spécifiquement.
 
 ```sql
-create or replace view public.study_chapters_with_progress as
+-- drop + create (pas "create or replace") : la colonne is_organizational
+-- (§6bis) a été ajoutée à study_chapters après la création initiale de
+-- cette vue, et Postgres refuse un "create or replace" qui changerait la
+-- position/le nom d'une colonne de sortie existante (erreur 42P16) — sans
+-- risque, une vue ne stocke aucune donnée, drop ne supprime rien.
+drop view if exists public.study_chapters_with_progress;
+
+create view public.study_chapters_with_progress as
 select
   c.*,
   greatest(
@@ -430,6 +437,8 @@ left join lateral (
   ) h
 ) ex on true
 group by c.id, ex.exercise_mastery_pct;
+
+alter view public.study_chapters_with_progress set (security_invoker = true);
 ```
 
 | Champ | Calcul | `null`/`0` quand |
@@ -542,55 +551,12 @@ Un chapitre marqué `is_organizational = true` :
 
 `study_chapters.*` dans `study_chapters_with_progress` (§4) inclut automatiquement cette colonne — pas de migration de vue nécessaire.
 
-## 6ter. Fix `reviews` jamais écrit + maîtrise par exercices
+## 6ter. Fix `reviews` jamais écrit + maîtrise par exercices — FAIT
 
-**À exécuter** — deux problèmes trouvés en usage réel (chapitre pratiqué via Carte de concepts, maîtrise restée à 0% après un chapitre visiblement fini) :
+Deux problèmes trouvés en usage réel (chapitre pratiqué via Carte de concepts, maîtrise restée à 0% après un chapitre visiblement fini) :
 
-1. `saveFlashcardProgress` (lib/study/flashcard-queries.ts) faisait un `upsert` sans jamais inclure `reviews` — la colonne restait à son `default 0` pour toujours, quel que soit le nombre réel de révisions. Bug corrigé côté code (`reviews: state.reviews` ajouté à l'upsert), rien à migrer en base pour ce point : les lignes déjà écrites avec `reviews = 0` se corrigeront de fait à la prochaine notation de chacune de ces cartes.
-2. `mastery_pct` ne comptait que les flashcards — jamais les exercices (Speed Round, Carte, Memory, Bug Hunt, Texte à trous). Un chapitre pratiqué uniquement via ces modes restait à 0% même sans le bug ci-dessus. La vue `study_chapters_with_progress` du §4 a été réécrite pour combiner les deux signaux (le plus favorable des deux) — **remplacer la vue existante par la nouvelle définition du §4** :
-
-```sql
--- Recolle exactement la définition du §4 ci-dessus (create or replace,
--- donc sans risque de doublon) :
-create or replace view public.study_chapters_with_progress as
-select
-  c.*,
-  greatest(
-    coalesce(
-      round(
-        100.0 * count(distinct f.id) filter (
-          where p.reviews > 0 and p.ease_factor >= 2.5 and p.last_grade in ('good', 'easy')
-        ) / nullif(count(distinct f.id), 0)
-      ),
-      0
-    ),
-    coalesce(ex.exercise_mastery_pct, 0)
-  )::int as mastery_pct,
-  min(p.due_at) filter (where p.reviews > 0) as next_review
-from public.study_chapters c
-left join public.study_flashcards f on f.study_chapter_id = c.id
-left join public.study_flashcards_progress p
-  on p.flashcard_id = f.id and p.user_id = c.user_id
-left join lateral (
-  select
-    case when count(*) >= 3
-      then round(100.0 * count(*) filter (where h.correct) / count(*))
-      else null
-    end as exercise_mastery_pct
-  from (
-    select correct
-    from public.study_exercise_history
-    where study_chapter_id = c.id and user_id = c.user_id
-    order by answered_at desc
-    limit 10
-  ) h
-) ex on true
-group by c.id, ex.exercise_mastery_pct;
-
--- Ré-applique le security_invoker (§4bis) — create or replace le remet
--- au comportement par défaut, à refaire chaque fois que la vue change :
-alter view public.study_chapters_with_progress set (security_invoker = true);
-```
+1. `saveFlashcardProgress` (lib/study/flashcard-queries.ts) faisait un `upsert` sans jamais inclure `reviews` — la colonne restait à son `default 0` pour toujours, quel que soit le nombre réel de révisions. Corrigé côté code (`reviews: state.reviews` ajouté à l'upsert) ; rien à migrer en base pour ce point, les lignes déjà écrites avec `reviews = 0` se corrigent de fait à la prochaine notation de chacune de ces cartes.
+2. `mastery_pct` ne comptait que les flashcards — jamais les exercices. La vue `study_chapters_with_progress` a été remplacée par la définition du §4 (combine les deux signaux, le plus favorable des deux) — migration exécutée (`drop view` + `create view`, la première tentative en `create or replace` avait échoué avec l'erreur 42P16 à cause de la colonne `is_organizational` ajoutée depuis, réglé en droppant la vue avant de la recréer).
 
 Vérification : jouer un exercice sur un chapitre jusqu'à 3 bonnes réponses (n'importe quel type), revenir sur la page cours — `mastery_pct` doit refléter ce travail sans avoir touché aux flashcards.
 
