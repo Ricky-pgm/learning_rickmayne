@@ -5,11 +5,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, RotateCcw, Zap, Dumbbell, ThumbsUp, Star } from "lucide-react"
+import { Sparkles, RotateCcw, Zap, Dumbbell, ThumbsUp, Star, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSupabaseClient } from "@/lib/supabase"
 import { getApiErrorMessage } from "@/lib/api-errors"
-import { getCachedFlashcards, saveFlashcards, getFlashcardProgress, saveFlashcardProgress } from "@/lib/study/flashcard-queries"
+import { getCachedFlashcards, saveFlashcards, regenerateFlashcards, getFlashcardProgress, saveFlashcardProgress } from "@/lib/study/flashcard-queries"
 import { scheduleNext } from "@/lib/study/spaced-repetition"
 import type { Flashcard, FlashcardGrade } from "@/lib/study/types"
 import type { StudyChapter } from "@/lib/study/types"
@@ -42,12 +42,12 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
   const [error, setError] = useState("")
   const [streak, setStreak] = useState(0)
 
-  const loadCards = useCallback(async () => {
+  const loadCards = useCallback(async (forceRegenerate = false) => {
     setLoading(true)
     setError("")
     setStreak(0)
     try {
-      let existing = await getCachedFlashcards(chapter.id)
+      let existing = forceRegenerate ? [] : await getCachedFlashcards(chapter.id)
       if (existing.length === 0) {
         const res = await fetch('/api/study/flashcards', {
           method: 'POST',
@@ -56,7 +56,13 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error ?? 'Erreur')
-        existing = await saveFlashcards(chapter.id, data.cards)
+        // regenerateFlashcards supprime les anciennes cartes avant de
+        // réinsérer (sinon un appel forcé les doublerait) — saveFlashcards
+        // reste utilisé pour la première génération, où il n'y a rien à
+        // supprimer.
+        existing = forceRegenerate
+          ? await regenerateFlashcards(chapter.id, data.cards)
+          : await saveFlashcards(chapter.id, data.cards)
       }
       setCards(existing)
       setIndex(0)
@@ -67,6 +73,11 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
       setLoading(false)
     }
   }, [chapter])
+
+  function handleRegenerate() {
+    if (!confirm("Régénérer la Lernkartei ? Les anciennes cartes et leur progression de révision seront remplacées.")) return
+    loadCards(true)
+  }
 
   useEffect(() => {
     getSupabaseClient().auth.getUser().then(({ data }) => {
@@ -134,7 +145,7 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
     return (
       <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
         <p className="text-sm text-destructive">{error}</p>
-        <Button variant="outline" size="sm" className="mt-2" onClick={loadCards}>
+        <Button variant="outline" size="sm" className="mt-2" onClick={() => loadCards()}>
           Réessayer
         </Button>
       </div>
@@ -160,9 +171,14 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
           <p className="text-sm text-muted-foreground">
             {cards.length} carte{cards.length > 1 ? "s" : ""} révisée{cards.length > 1 ? "s" : ""}
           </p>
-          <Button variant="outline" size="sm" className="mt-2 gap-2" onClick={() => { setIndex(0); setFlipped(false); setStreak(0) }}>
-            <RotateCcw className="h-4 w-4" /> Recommencer
-          </Button>
+          <div className="mt-2 flex flex-wrap justify-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => { setIndex(0); setFlipped(false); setStreak(0) }}>
+              <RotateCcw className="h-4 w-4" /> Recommencer
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleRegenerate}>
+              <RefreshCw className="h-4 w-4" /> Régénérer les cartes
+            </Button>
+          </div>
         </CardContent>
       </Card>
     )

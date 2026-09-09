@@ -47,6 +47,31 @@ export async function saveFlashcards(studyChapterId: string, cards: GeneratedFla
   return (data ?? []) as Flashcard[]
 }
 
+/**
+ * Supprime les cartes existantes du chapitre avant d'en enregistrer de
+ * nouvelles — sans ça, appeler saveFlashcards deux fois pour le même
+ * chapitre (ex. bouton "Régénérer") DOUBLERAIT les cartes au lieu de les
+ * remplacer, puisque saveFlashcards ne fait qu'un insert. La suppression
+ * entraîne la perte de study_flashcards_progress associée (on delete
+ * cascade, voir docs/db-anpassung.md §3) — c'est voulu : une carte
+ * regénérée est un contenu différent, l'ancienne progression SM-2 ne
+ * s'applique plus à son nouveau texte. L'appelant doit donc confirmer
+ * explicitement avant d'appeler ceci (voir flashcard-review.tsx).
+ */
+export async function regenerateFlashcards(studyChapterId: string, cards: GeneratedFlashcard[]): Promise<Flashcard[]> {
+  const client = getSupabaseClient()
+  const { error: deleteError } = await client
+    .from("study_flashcards")
+    .delete()
+    .eq("study_chapter_id", studyChapterId)
+
+  if (deleteError) {
+    throw new Error(`Impossible de supprimer les anciennes flashcards: ${deleteError.message}`)
+  }
+
+  return saveFlashcards(studyChapterId, cards)
+}
+
 export async function getFlashcardProgress(
   userId: string,
   flashcardId: string
