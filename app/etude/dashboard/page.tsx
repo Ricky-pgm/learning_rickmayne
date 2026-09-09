@@ -265,7 +265,13 @@ export default function EtudeDashboardManager() {
                   <span className={cn("absolute right-2 top-2 h-1.5 w-1.5 rounded-full transition-transform", dotColor, newProfile === key ? "scale-125" : "scale-100 opacity-50")} />
                   <Icon className={cn("h-5 w-5 transition-colors", newProfile === key ? "text-ring" : "text-muted-foreground")} />
                   <p className="text-sm font-medium mt-1">{label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+                  {/* Masquée sur mobile plutôt que wrap sur 3-4 lignes en
+                      text-xs — à 3 colonnes sur ~375px, ça donnait 3
+                      boutons de hauteurs inégales (la ligne la plus longue
+                      étirant les deux autres). L'icône + le label
+                      suffisent pour choisir au pouce ; le détail revient
+                      à partir de sm:. */}
+                  <p className="hidden text-xs text-muted-foreground mt-0.5 sm:block">{description}</p>
                 </button>
               ))}
             </div>

@@ -190,8 +190,8 @@ export default function EtudeDashboardPage() {
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="space-y-6">
           <div className="h-8 w-48 rounded bg-muted/60 animate-pulse" />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {[1, 2, 3, 4].map(i => (
               <div key={i} className="h-24 rounded-lg bg-muted/40 animate-pulse" />
             ))}
           </div>
@@ -289,8 +289,12 @@ export default function EtudeDashboardPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-ring/80">Recommandé pour toi</p>
-                <p className="text-sm font-medium mt-0.5">
-                  {EXERCISE_LABELS[nextExerciseType]} sur <span className="truncate">{priorityChapter.title}</span>
+                {/* truncate sur un span inline ne coupe rien tant que le
+                    <p> parent n'a pas lui-même une largeur contrainte —
+                    sur mobile avec un titre de chapitre long, ça débordait
+                    ou wrappait sur 2-3 lignes au lieu de tronquer proprement. */}
+                <p className="truncate text-sm font-medium mt-0.5">
+                  {EXERCISE_LABELS[nextExerciseType]} sur {priorityChapter.title}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">{priorityChapter.course_title}</p>
               </div>
