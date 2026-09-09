@@ -54,9 +54,71 @@ export async function callClaude({ model, prompt, maxTokens = 2000, effort }: Ca
   return extractTextBlock(data.content)
 }
 
+/**
+ * Neutralise les caractères de contrôle bruts (retour à la ligne, tab...)
+ * quand ils apparaissent À L'INTÉRIEUR d'une chaîne JSON — Claude en
+ * insère parfois dans un exemple de code multi-ligne au lieu de les
+ * échapper en \n, ce que JSON.parse refuse (erreur "Bad control character
+ * in string literal"). On ne touche qu'aux caractères entre guillemets non
+ * échappés, jamais à la structure JSON elle-même (les vrais retours à la
+ * ligne de mise en forme, hors chaînes, restent intacts).
+ */
+function sanitizeControlCharsInStrings(text: string): string {
+  let out = ""
+  let inString = false
+  let escaped = false
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) {
+        out += ch
+        escaped = false
+      } else if (ch === "\\") {
+        out += ch
+        escaped = true
+      } else if (ch === '"') {
+        out += ch
+        inString = false
+      } else if (ch === "\n") {
+        out += "\\n"
+      } else if (ch === "\r") {
+        out += "\\r"
+      } else if (ch === "\t") {
+        out += "\\t"
+      } else {
+        out += ch
+      }
+    } else {
+      out += ch
+      if (ch === '"') inString = true
+    }
+  }
+  return out
+}
+
+/** Virgules traînantes avant `}` ou `]` — invalides en JSON strict, mais un
+ * modèle qui a appris JS/JSON5 en glisse occasionnellement une. */
+function stripTrailingCommas(text: string): string {
+  return text.replace(/,(\s*[}\]])/g, "$1")
+}
+
 export function extractJSON(text: string): unknown {
   const start = text.indexOf("{")
   const end = text.lastIndexOf("}")
   if (start === -1 || end === -1) throw new Error("Pas de JSON trouvé dans la réponse IA")
-  return JSON.parse(text.slice(start, end + 1))
+  const raw = text.slice(start, end + 1)
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    // Repli en deux passes plutôt qu'un échec immédiat : la plupart des
+    // erreurs observées (caractère de contrôle, virgule manquante) sont
+    // des défauts de formatage isolés, pas un JSON réellement tronqué —
+    // pas besoin de rappeler l'API pour ça.
+    try {
+      return JSON.parse(stripTrailingCommas(sanitizeControlCharsInStrings(raw)))
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e)
+      throw new Error(`JSON invalide dans la réponse IA (${detail})`)
+    }
+  }
 }

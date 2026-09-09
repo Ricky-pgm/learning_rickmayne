@@ -26,6 +26,7 @@ import type { CourseProfile, StudyCourse, StudyCourseFile } from "@/lib/study/ty
 
 export default function EtudeDashboardManager() {
   const [userId, setUserId] = useState<string | null>(null)
+  const [coursesLoaded, setCoursesLoaded] = useState(false)
   const [courses, setCourses] = useState<StudyCourse[]>([])
   const [selectedCourse, setSelectedCourse] = useState<StudyCourse | null>(null)
   const [files, setFiles] = useState<StudyCourseFile[]>([])
@@ -51,6 +52,8 @@ export default function EtudeDashboardManager() {
       setCourses(await listCourses(userId))
     } catch (e) {
       setError(getApiErrorMessage(e instanceof Error ? e.message : String(e)))
+    } finally {
+      setCoursesLoaded(true)
     }
   }, [userId])
 
@@ -242,19 +245,25 @@ export default function EtudeDashboardManager() {
           <div className="space-y-2">
             <Label>Profil</Label>
             <div className="grid grid-cols-3 gap-2">
-              {(Object.entries(PROFILE_UI) as [CourseProfile, typeof PROFILE_UI[CourseProfile]][]).map(([key, { label, description, icon: Icon }]) => (
+              {(Object.entries(PROFILE_UI) as [CourseProfile, typeof PROFILE_UI[CourseProfile]][]).map(([key, { label, description, icon: Icon, dotColor }]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setNewProfile(key)}
                   className={cn(
-                    "rounded-lg border p-3 text-left transition-all",
+                    "group relative overflow-hidden rounded-lg border p-3 text-left transition-all",
                     newProfile === key
-                      ? "border-ring bg-ring/10"
+                      ? "border-ring bg-ring/10 shadow-sm"
                       : "border-border/70 hover:border-ring/40 hover:bg-muted/40",
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  {/* Pastille de couleur du profil plutôt qu'un simple
+                      contour sélectionné : la même teinte réapparaît sur
+                      la carte du cours une fois créé (bande latérale) et
+                      sur ChapterCard — un même code couleur traverse toute
+                      l'app plutôt que de s'arrêter à cet écran. */}
+                  <span className={cn("absolute right-2 top-2 h-1.5 w-1.5 rounded-full transition-transform", dotColor, newProfile === key ? "scale-125" : "scale-100 opacity-50")} />
+                  <Icon className={cn("h-5 w-5 transition-colors", newProfile === key ? "text-ring" : "text-muted-foreground")} />
                   <p className="text-sm font-medium mt-1">{label}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
                 </button>
@@ -277,7 +286,15 @@ export default function EtudeDashboardManager() {
           <BookOpen className="h-5 w-5" /> Mes cours ({courses.length})
         </h2>
 
-        {courses.length === 0 && (
+        {!coursesLoaded && (
+          <div className="space-y-2">
+            {[1, 2].map(i => (
+              <div key={i} className="h-[68px] rounded-lg bg-muted/40 animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {coursesLoaded && courses.length === 0 && (
           <Card className="border-dashed border-2 border-muted-foreground/20 bg-muted/10">
             <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
               <FileText className="h-8 w-8 text-muted-foreground/40" />
@@ -287,43 +304,66 @@ export default function EtudeDashboardManager() {
         )}
 
         <div className="space-y-2">
-          {courses.map(course => {
+          {courses.map((course, i) => {
             const isSelected = selectedCourse?.id === course.id
             const profileInfo = PROFILE_UI[course.profile]
             return (
-              <div key={course.id}>
+              <div
+                key={course.id}
+                className="animate-in fade-in slide-in-from-bottom-1 duration-300 fill-mode-both"
+                style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
+              >
                 <Card
                   className={cn(
-                    "border bg-card shadow-none transition-all cursor-pointer",
-                    isSelected ? "border-ring" : "border-border/70 hover:border-ring/40",
+                    "overflow-hidden border bg-card p-0 shadow-none transition-all cursor-pointer",
+                    isSelected ? "border-ring shadow-sm" : "border-border/70 hover:border-ring/40",
                   )}
                   onClick={() => setSelectedCourse(isSelected ? null : course)}
                 >
-                  <CardContent className="flex items-center justify-between gap-3 p-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">{course.title}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary" className="gap-1 text-xs">
-                          <profileInfo.icon className="h-3 w-3" /> {profileInfo.label}
-                        </Badge>
+                  <CardContent className="flex items-stretch gap-0 p-0">
+                    {/* Même code couleur que le sélecteur de profil et
+                        ChapterCard — la teinte d'un cours reste
+                        reconnaissable d'un écran à l'autre. */}
+                    <div className={cn("w-1 flex-shrink-0", profileInfo.dotColor)} />
+                    <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3.5 py-3.5 sm:px-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold truncate">{course.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            <profileInfo.icon className="h-3 w-3" /> {profileInfo.label}
+                          </Badge>
+                          {course.exam_date && (
+                            <Badge variant="outline" className="gap-1 text-xs border-warning/30 text-warning">
+                              <CalendarDays className="h-3 w-3" /> {new Date(course.exam_date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); handleDelete(course.id) }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(course.id) }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <ArrowRight
+                          className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                            isSelected && "rotate-90",
+                          )}
+                        />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Expanded file section */}
+                {/* Expanded file section — panneau propre plutôt qu'un
+                    simple retrait indenté, cohérent avec le traitement
+                    "phase" du reste de l'app (fond + bordure teintés). */}
                 {isSelected && (
-                  <div className="ml-4 mt-2 space-y-4 border-l-2 border-ring/30 pl-4">
+                  <div className="animate-in fade-in slide-in-from-top-1 mt-2 space-y-4 rounded-lg border border-ring/20 bg-ring/[0.03] p-4 duration-200">
                     {/* Date d'examen + export du planning de révision —
                         saisie manuelle (voir docs/db-anpassung.md §3ter),
                         pas d'extraction automatique depuis un planning
@@ -337,7 +377,7 @@ export default function EtudeDashboardManager() {
                           type="date"
                           value={examDateDraft}
                           onChange={e => setExamDateDraft(e.target.value)}
-                          className="w-auto"
+                          className="w-auto bg-card"
                         />
                         <Button
                           variant="outline"
@@ -372,13 +412,13 @@ export default function EtudeDashboardManager() {
                       onDragLeave={() => setDragging(false)}
                       onDrop={handleDrop}
                       className={cn(
-                        "relative flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center transition-colors",
+                        "relative flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center transition-all",
                         dragging
-                          ? "border-ring bg-ring/10"
-                          : "border-border/50 hover:border-ring/40 hover:bg-muted/20",
+                          ? "scale-[1.01] border-ring bg-ring/10"
+                          : "border-border/50 bg-card hover:border-ring/40 hover:bg-muted/20",
                       )}
                     >
-                      <FileUp className="h-8 w-8 text-muted-foreground/50" />
+                      <FileUp className={cn("h-8 w-8 transition-transform", dragging ? "scale-110 text-ring" : "text-muted-foreground/50")} />
                       <p className="text-sm text-muted-foreground">
                         {uploading ? (
                           <span className="flex items-center gap-2"><Spinner className="size-4" /> Importation…</span>
@@ -388,7 +428,7 @@ export default function EtudeDashboardManager() {
                       </p>
                       {!uploading && (
                         <label className="cursor-pointer text-sm font-medium text-ring hover:underline">
-                          parcouner
+                          parcourir
                           <input
                             type="file"
                             multiple
@@ -404,12 +444,13 @@ export default function EtudeDashboardManager() {
                     {files.length > 0 && (
                       <div className="space-y-1">
                         {files.map(f => (
-                          <div key={f.id} className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-muted/40 transition-colors">
-                            <span className="text-sm truncate">{f.file_name}</span>
+                          <div key={f.id} className="group flex items-center gap-2.5 rounded-md bg-card px-3 py-2 transition-colors hover:bg-muted/40">
+                            <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60" />
+                            <span className="min-w-0 flex-1 truncate text-sm">{f.file_name}</span>
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive flex-shrink-0"
+                              className="h-6 w-6 flex-shrink-0 p-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
                               onClick={(e) => { e.stopPropagation(); handleDeleteFile(f.id) }}
                             >
                               <Trash2 className="h-3 w-3" />
@@ -421,7 +462,7 @@ export default function EtudeDashboardManager() {
 
                     {files.length > 0 && (
                       <Link href={`/etude/${course.id}`}>
-                        <Button variant="outline" size="sm" className="w-full gap-2">
+                        <Button variant="outline" size="sm" className="w-full gap-2 bg-card">
                           Voir les chapitres <ArrowRight className="h-3.5 w-3.5" />
                         </Button>
                       </Link>

@@ -18,10 +18,18 @@ import type { Lang } from "@/lib/chapters/types"
 interface Props {
   chapter: StudyChapter
   lang: Lang
+  /** Remonté à l'ouverture du panneau — sert à StudyPhase pour marquer
+   * la phase "Comprendre" comme entamée sur la page chapitre, sans
+   * dupliquer l'état d'ouverture ici et côté parent. */
+  onOpenChange?: (open: boolean) => void
 }
 
-export function DetailedLessonView({ chapter, lang }: Props) {
-  const [open, setOpen] = useState(false)
+export function DetailedLessonView({ chapter, lang, onOpenChange }: Props) {
+  const [open, setOpenState] = useState(false)
+  const setOpen = useCallback((v: boolean) => {
+    setOpenState(v)
+    onOpenChange?.(v)
+  }, [onOpenChange])
   const [lesson, setLesson] = useState<DetailedLesson | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")

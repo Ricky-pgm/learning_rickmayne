@@ -16,6 +16,9 @@ import type { StudyChapter } from "@/lib/study/types"
 
 interface Props {
   chapter: StudyChapter
+  /** Appelé une fois quand la série de cartes du jour est terminée — sert
+   * à StudyPhase pour marquer la phase "Mémoriser" comme faite. */
+  onSeriesComplete?: () => void
 }
 
 const GRADE_CONFIG: { grade: FlashcardGrade; label: string; icon: typeof RotateCcw; tone: string }[] = [
@@ -25,7 +28,7 @@ const GRADE_CONFIG: { grade: FlashcardGrade; label: string; icon: typeof RotateC
   { grade: "easy", label: "Facile", icon: Star, tone: "border-success/30 text-success hover:bg-success/10" },
 ]
 
-export function FlashcardReview({ chapter }: Props) {
+export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
   const [userId, setUserId] = useState<string | null>(null)
   const [cards, setCards] = useState<Flashcard[]>([])
   const [index, setIndex] = useState(0)
@@ -98,7 +101,11 @@ export function FlashcardReview({ chapter }: Props) {
     }
 
     setFlipped(false)
-    setIndex(i => i + 1)
+    setIndex(i => {
+      const next = i + 1
+      if (next >= cards.length) onSeriesComplete?.()
+      return next
+    })
   }
 
   if (!started) {

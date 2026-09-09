@@ -26,7 +26,10 @@ import { FillBlank } from "@/components/study/exercises/fill-blank"
 import { CodeComplete } from "@/components/study/exercises/code-complete"
 import { WebEnrichmentView } from "@/components/study/web-enrichment-view"
 import { StudyPhase } from "@/components/study/study-phase"
+import { TimeRing } from "@/components/study/time-ring"
 import { getExerciseSlots } from "@/lib/study/exercise-strategy"
+import { estimateChapterTime } from "@/lib/study/time-estimate"
+import { getCachedFlashcards } from "@/lib/study/flashcard-queries"
 import type { StudyChapter } from "@/lib/study/types"
 import type { Lang } from "@/lib/chapters/types"
 
@@ -50,6 +53,18 @@ export default function StudyChapterPage({
   // n'est pas conditionné par la sélection côté base-ui), ce qui
   // déclencherait un appel API par exercice au lieu d'un seul.
   const [visitedExercises, setVisitedExercises] = useState<Set<string>>(new Set())
+  // Signale l'avancement réel dans chaque phase — purement visuel (voir
+  // StudyPhase), remis à zéro à chaque montage donc pas persisté : rouvrir
+  // le chapitre plus tard montre à nouveau les trois phases "à faire",
+  // cohérent avec le fait que le cours/les cartes ne se rouvrent pas non
+  // plus automatiquement.
+  const [lessonOpened, setLessonOpened] = useState(false)
+  const [flashcardsDone, setFlashcardsDone] = useState(false)
+  // Affine l'estimation de temps avec le vrai nombre de cartes une fois
+  // connu (lecture de cache, gratuite) — undefined tant que non chargé,
+  // estimateChapterTime retombe alors sur une estimation à partir du
+  // nombre de concepts.
+  const [realFlashcardCount, setRealFlashcardCount] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     let cancelled = false
@@ -69,6 +84,18 @@ export default function StudyChapterPage({
     })
     return () => { cancelled = true }
   }, [params])
+
+  useEffect(() => {
+    if (!chapter) return
+    let cancelled = false
+    getCachedFlashcards(chapter.id)
+      .then(cards => { if (!cancelled && cards.length > 0) setRealFlashcardCount(cards.length) })
+      .catch(() => {
+        // Best-effort — l'estimation retombe sur le nombre de concepts,
+        // jamais bloquant pour l'affichage de la page.
+      })
+    return () => { cancelled = true }
+  }, [chapter])
 
   if (loading) {
     return (
@@ -101,6 +128,8 @@ export default function StudyChapterPage({
   const positionInCourse = allChapters.findIndex(c => c.id === chapter.id) + 1
   const totalChapters = allChapters.length
   const courseTitle = chapter.course_title
+  const timeEstimate = estimateChapterTime(chapter.concepts.length, chapter.profile, chapter.has_code, realFlashcardCount)
+  const phasesDone = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (visitedExercises.size > 0 ? 1 : 0)
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 space-y-10">
@@ -117,12 +146,15 @@ export default function StudyChapterPage({
           <span className="text-foreground">Chapitre {positionInCourse}</span>
         </nav>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="text-xs">{profileLabel}</Badge>
-            <Badge variant="outline" className="text-xs">Chapitre {positionInCourse}/{totalChapters}</Badge>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="text-xs">{profileLabel}</Badge>
+              <Badge variant="outline" className="text-xs">Chapitre {positionInCourse}/{totalChapters}</Badge>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-balance">{chapter.title}</h1>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-balance">{chapter.title}</h1>
+          <TimeRing estimate={timeEstimate} phasesDone={phasesDone} className="flex-shrink-0" />
         </div>
       </div>
 
@@ -135,6 +167,7 @@ export default function StudyChapterPage({
         title="Comprendre"
         subtitle="Le contenu du chapitre, expliqué et approfondi"
         tone="ring"
+        done={lessonOpened}
       >
         {chapter.concepts.length > 0 && (
           <div className="rounded-lg border border-border/70 bg-card p-4">
@@ -143,14 +176,18 @@ export default function StudyChapterPage({
             </h3>
             <div className="flex flex-wrap gap-2">
               {chapter.concepts.map(c => (
-                <Badge key={c} variant="outline" className="text-xs border-ring/30 text-ring">
+                <Badge
+                  key={c}
+                  variant="outline"
+                  className="text-xs border-ring/30 text-ring transition-colors hover:bg-ring/10"
+                >
                   {c}
                 </Badge>
               ))}
             </div>
           </div>
         )}
-        <DetailedLessonView chapter={chapter} lang={lang} />
+        <DetailedLessonView chapter={chapter} lang={lang} onOpenChange={o => o && setLessonOpened(true)} />
         <WebEnrichmentView chapter={chapter} />
       </StudyPhase>
 
@@ -159,9 +196,10 @@ export default function StudyChapterPage({
         title="Mémoriser"
         subtitle="Cartes recto-verso, révisées par répétition espacée"
         tone="warning"
+        done={flashcardsDone}
       >
         <div className="rounded-lg border border-border/70 bg-card p-4">
-          <FlashcardReview chapter={chapter} />
+          <FlashcardReview chapter={chapter} onSeriesComplete={() => setFlashcardsDone(true)} />
         </div>
       </StudyPhase>
 
@@ -200,6 +238,7 @@ export default function StudyChapterPage({
             title="S'entraîner"
             subtitle={`${playableSlots.length} exercice${playableSlots.length > 1 ? "s" : ""} adapté${playableSlots.length > 1 ? "s" : ""} à ce chapitre`}
             tone="success"
+            done={visitedExercises.size > 0}
           >
             <Tabs
               value={activeExercise}

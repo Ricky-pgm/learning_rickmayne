@@ -8,12 +8,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertAction } from "@/components/ui/alert"
 import { Spinner } from "@/components/ui/spinner"
-import { ArrowLeft, ArrowRight, FileText, Sparkles, AlertCircle, CheckCircle2, BookOpen } from "lucide-react"
+import { ArrowLeft, ArrowRight, FileText, Sparkles, AlertCircle, CheckCircle2, BookOpen, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { getStudyCourse, listFiles, updateStudyCourseFileStatus, saveIngestResult, countStudyChapters, advanceNextSliceIndex } from "@/lib/study/queries"
 import { listStudyChaptersWithProgress, type StudyChapterWithProgress } from "@/lib/study/lesson-queries"
 import { PROFILE_UI } from "@/lib/study/profile-ui"
+import { estimateChapterTime } from "@/lib/study/time-estimate"
 import type { IngestResult } from "@/lib/study/ingest-prompt"
 import type { IngestPlan } from "@/app/api/study/ingest/plan/route"
 import type { StudyCourse, StudyCourseFile } from "@/lib/study/types"
@@ -286,6 +287,7 @@ export default function EtudeCoursePage() {
               .map(ch => {
                 const isDue = ch.next_review !== null && new Date(ch.next_review) <= new Date()
                 const isMastered = ch.mastery_pct === 100
+                const timeEstimate = estimateChapterTime(ch.concepts.length, ch.profile, ch.has_code)
                 return (
                   <Link key={ch.id} href={`/etude/${courseId}/kapitel/${ch.id}`}>
                     <Card className="overflow-hidden border border-border/70 bg-card p-0 shadow-none transition-all hover:border-ring/40 hover:shadow-sm cursor-pointer">
@@ -321,6 +323,11 @@ export default function EtudeCoursePage() {
                             <Badge variant="outline" className="flex-shrink-0 border-warning/40 text-xs text-warning">
                               À réviser
                             </Badge>
+                          )}
+                          {!isMastered && (
+                            <span className="hidden flex-shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
+                              <Clock className="h-3 w-3" /> ~{timeEstimate.totalMinutes} min
+                            </span>
                           )}
                           <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                         </div>
