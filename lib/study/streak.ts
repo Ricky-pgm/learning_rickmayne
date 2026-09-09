@@ -31,14 +31,34 @@ export function highestReachedMilestone(current: number): number | null {
   return reached.length > 0 ? reached[reached.length - 1] : null
 }
 
+/**
+ * Convertit un timestamp DB (toujours en UTC) en clé de jour LOCALE —
+ * "2026-09-02T23:30:00Z" doit compter comme le 3 (pas le 2) pour un
+ * utilisateur en UTC+2 qui révise à 1h30 du matin chez lui. slice(0, 10)
+ * sur l'ISO brut (bug corrigé) restait en UTC : un étudiant qui révise
+ * tard le soir ou tôt le matin pouvait voir son streak cassé ou avancé
+ * au mauvais jour de son propre calendrier. Même correction que
+ * toISODate dans exam-schedule.ts.
+ */
 function toDayKey(iso: string): string {
-  return iso.slice(0, 10) // "2026-09-02T10:00:00Z" -> "2026-09-02"
+  const d = new Date(iso)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
+// addDays/todayKey manipulent des clés déjà en calendrier local (voir
+// toDayKey) — construits et lus en LOCAL (pas UTC) pour rester cohérents
+// avec elles, jamais mélanger les deux référentiels sur les mêmes clés.
 function addDays(dayKey: string, delta: number): string {
-  const d = new Date(dayKey + "T00:00:00Z")
-  d.setUTCDate(d.getUTCDate() + delta)
-  return d.toISOString().slice(0, 10)
+  const [year, month, day] = dayKey.split("-").map(Number)
+  const d = new Date(year, month - 1, day)
+  d.setDate(d.getDate() + delta)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const dd = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${dd}`
 }
 
 /**
@@ -101,6 +121,9 @@ export async function getStudyStreak(userId: string): Promise<StudyStreak> {
   for (const row of flashcardDates.data ?? []) activeDays.add(toDayKey(row.updated_at))
   for (const row of exerciseDates.data ?? []) activeDays.add(toDayKey(row.answered_at))
 
-  const todayKey = new Date().toISOString().slice(0, 10)
+  // toDayKey(new Date().toISOString()) plutôt qu'un slice direct — passe
+  // par la même conversion locale que les jours d'activité, sinon on
+  // comparerait un "aujourd'hui" en UTC à des jours calculés en local.
+  const todayKey = toDayKey(new Date().toISOString())
   return computeStreak(activeDays, todayKey)
 }

@@ -13,9 +13,12 @@ import { getExerciseSlots } from "./exercise-strategy"
  *   ~60s/concept, ordre de grandeur standard pour un paragraphe technique
  *   avec exemple (~150-200 mots lus + traités, pas juste survolés).
  * - Révision d'une flashcard recto-verso avec notation (SM-2, comme Anki) :
- *   ~20-25s/carte en moyenne toutes difficultés confondues — c'est la
- *   fourchette généralement citée pour une session Anki fluide (lecture
- *   du recto, rappel actif, retournement, notation). On prend 22s.
+ *   ~20-25s/carte en moyenne toutes difficultés confondues pour une carte
+ *   Anki classique (définition courte). Le contenu des Lernkartei de
+ *   cette app est plus riche depuis la révision du prompt (verso avec
+ *   exemple concret ou piège fréquent, pas juste une définition
+ *   compressée) — le temps de lecture réel s'en rapproche plutôt de
+ *   celui d'une carte "cloze" détaillée, d'où 30s plutôt que 22s.
  * - Un exercice interactif complet (Speed Round, Bug Hunt, Memory...) :
  *   ~3 min en moyenne — cohérent avec un Speed Round de 8-10 questions ou
  *   un Bug Hunt/Memory d'un seul défi, plus long qu'une carte isolée mais
@@ -26,7 +29,7 @@ import { getExerciseSlots } from "./exercise-strategy"
  */
 
 const SECONDS_PER_CONCEPT = 60
-const SECONDS_PER_FLASHCARD = 22
+const SECONDS_PER_FLASHCARD = 30
 const SECONDS_PER_EXERCISE = 180
 /** Forfait fixe : ouverture, lecture de l'intro, navigation entre sections. */
 const SECONDS_FIXED_OVERHEAD = 60
