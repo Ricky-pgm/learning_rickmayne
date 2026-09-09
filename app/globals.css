@@ -245,3 +245,22 @@
     cursor: pointer;
   }
 }
+
+/* Tremblement de feedback sur une mauvaise réponse — utilisé par les
+   exercices (Bug Hunt, Code Complete, Memory Match) sur un clic incorrect.
+   Respecte prefers-reduced-motion via le sélecteur ci-dessous plutôt que
+   d'exiger que chaque appelant s'en souvienne. */
+@keyframes shake-wrong {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.animate-shake-wrong {
+  animation: shake-wrong 0.4s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-shake-wrong {
+    animation: none;
+  }
+}

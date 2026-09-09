@@ -225,11 +225,9 @@ export function MemoryMatch({ chapter }: Props) {
                 <div
                   className={cn(
                     "absolute inset-0 flex items-center justify-center rounded-lg border p-1.5 text-center text-[11px] leading-tight font-medium transition-colors sm:text-xs",
-                    isWrong
-                      ? "border-destructive/50 bg-destructive/10 text-destructive"
-                      : isMatched
-                        ? "border-success/50 bg-success/10 text-success"
-                        : "border-ring/40 bg-ring/5",
+                    isWrong && "animate-shake-wrong border-destructive/50 bg-destructive/10 text-destructive",
+                    isMatched && "animate-in zoom-in-90 border-success/50 bg-success/10 text-success duration-300",
+                    !isWrong && !isMatched && "border-ring/40 bg-ring/5",
                   )}
                   style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
                 >

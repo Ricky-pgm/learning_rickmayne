@@ -119,7 +119,7 @@ export function CodeComplete({ chapter }: Props) {
               <span className="select-none text-muted-foreground/40 tabular-nums">{challenge.code_before.length + 1}</span>
               <span className={cn(
                 "flex-1 font-medium",
-                solved ? "text-success" : "text-ring",
+                solved ? "animate-in fade-in zoom-in-95 text-success duration-300" : "text-ring",
               )}>
                 {solved ? challenge.options[challenge.correct_index] : "// ?"}
               </span>
@@ -148,7 +148,7 @@ export function CodeComplete({ chapter }: Props) {
                 className={cn(
                   "rounded-lg border px-3 py-2.5 text-left font-mono text-xs transition-all sm:text-sm",
                   isWrong
-                    ? "border-destructive/40 bg-destructive/10 text-destructive line-through decoration-destructive/50"
+                    ? "animate-shake-wrong border-destructive/40 bg-destructive/10 text-destructive line-through decoration-destructive/50"
                     : "border-border hover:border-ring/40 hover:bg-muted/40",
                 )}
               >

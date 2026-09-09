@@ -136,6 +136,8 @@ export function BugHunt({ chapter }: Props) {
                   disabled={!isClickable || isWrong}
                   className={cn(
                     "flex w-full items-start gap-3 whitespace-pre px-3 py-1.5 text-left transition-colors",
+                    isWrong && "animate-shake-wrong",
+                    isFound && "animate-in fade-in zoom-in-95 duration-300",
                     isClickable && !isWrong && "cursor-pointer hover:bg-ring/10",
                     isWrong && "bg-destructive/10 text-destructive line-through decoration-destructive/50",
                     isFound && "bg-success/10 text-success font-medium",
