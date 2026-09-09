@@ -14,6 +14,10 @@ import type { FillBlankChallenge } from "@/lib/study/fill-blank-prompt"
 
 interface Props {
   chapter: StudyChapter
+  /** Voir speed-round.tsx — appelé une fois le texte complété SANS erreur
+   * (finished ici, pas "checked" : un premier essai raté ne compte pas
+   * comme la phase "S'entraîner" terminée, seul un texte réussi compte). */
+  onComplete?: () => void
 }
 
 type Segment = { type: "text"; value: string } | { type: "blank"; index: number }
@@ -48,7 +52,7 @@ function shuffle<T>(arr: T[]): T[] {
  * d'avis (recliquer un trou rempli le libère) avant de savoir si c'est
  * bon, au lieu de sanctionner chaque choix dans l'instant.
  */
-export function FillBlank({ chapter }: Props) {
+export function FillBlank({ chapter, onComplete }: Props) {
   const [challenge, setChallenge] = useState<FillBlankChallenge | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -101,8 +105,9 @@ export function FillBlank({ chapter }: Props) {
   useEffect(() => {
     if (checked) {
       recordExerciseAttempt(chapter.id, "fillBlank", correctCount === totalBlanks)
+      if (correctCount === totalBlanks) onComplete?.()
     }
-  }, [checked, correctCount, totalBlanks, chapter.id])
+  }, [checked, correctCount, totalBlanks, chapter.id, onComplete])
 
   function handleTagClick(tag: string) {
     if (checked) return

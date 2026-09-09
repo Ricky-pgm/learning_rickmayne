@@ -81,8 +81,15 @@ export function ChapterCompleteCelebration({ open, onClose, chapterTitle, nextHr
           </DialogDescription>
           {nextHref && nextChapterTitle ? (
             <a href={nextHref} className="block">
-              <Button className="w-full gap-2" onClick={onClose}>
-                Chapitre suivant : {nextChapterTitle} <ArrowRight className="h-4 w-4" />
+              {/* Button force whitespace-nowrap (par design, pour son
+                  usage habituel avec un texte court) — un titre de
+                  chapitre long se faisait donc couper au lieu de passer
+                  à la ligne. Le texte dynamique passe dans un span à part
+                  qui autorise le wrap ; le bouton lui-même s'étire en
+                  hauteur pour l'accueillir plutôt que le tronquer. */}
+              <Button className="h-auto w-full gap-2 whitespace-normal py-2.5 text-center" onClick={onClose}>
+                <span className="flex-1">Chapitre suivant : {nextChapterTitle}</span>
+                <ArrowRight className="h-4 w-4 flex-shrink-0" />
               </Button>
             </a>
           ) : (

@@ -14,6 +14,8 @@ import type { Flashcard, StudyChapter } from "@/lib/study/types"
 
 interface Props {
   chapter: StudyChapter
+  /** Voir speed-round.tsx — appelé une fois toutes les paires trouvées. */
+  onComplete?: () => void
 }
 
 // Assez de paires pour que le jeu reste un vrai jeu de mémoire (pas trivial
@@ -53,7 +55,7 @@ function buildDeck(cards: Flashcard[]): MemoryCard[] {
  * back_de) au lieu de payer un nouvel appel IA pour un contenu équivalent
  * — même paire concept/définition, présentée en jeu plutôt qu'en liste.
  */
-export function MemoryMatch({ chapter }: Props) {
+export function MemoryMatch({ chapter, onComplete }: Props) {
   const [allCards, setAllCards] = useState<Flashcard[] | null>(null)
   const [deck, setDeck] = useState<MemoryCard[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,8 +94,9 @@ export function MemoryMatch({ chapter }: Props) {
   useEffect(() => {
     if (finished) {
       recordExerciseAttempt(chapter.id, "matching", true)
+      onComplete?.()
     }
-  }, [finished, chapter.id])
+  }, [finished, chapter.id, onComplete])
 
   function handleFlip(index: number) {
     if (locked) return

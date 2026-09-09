@@ -17,6 +17,12 @@ import type { Lang } from "@/lib/chapters/types"
 interface Props {
   chapter: StudyChapter
   lang: Lang
+  /** Appelé une fois quand la série est terminée — sert à la page
+   * chapitre pour distinguer "exercice réellement fini" de "onglet
+   * simplement ouvert" (visitedExercises servait aux deux avant, à tort :
+   * cliquer l'onglet suffisait à marquer la phase "S'entraîner" comme
+   * faite sans avoir répondu à une seule question). */
+  onComplete?: () => void
 }
 
 // 12s se voulait "speed" mais ne laissait pas le temps de lire l'énoncé
@@ -45,7 +51,7 @@ function prepareQuestions(questions: SpeedRoundQuestion[]): ShuffledQuestion[] {
   })
 }
 
-export function SpeedRound({ chapter, lang }: Props) {
+export function SpeedRound({ chapter, lang, onComplete }: Props) {
   const [questions, setQuestions] = useState<ShuffledQuestion[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -139,6 +145,7 @@ export function SpeedRound({ chapter, lang }: Props) {
     if (!questions) return
     if (index + 1 >= questions.length) {
       setFinished(true)
+      onComplete?.()
       return
     }
     setIndex(i => i + 1)

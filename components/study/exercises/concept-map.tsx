@@ -14,6 +14,8 @@ import type { ConceptMapChallenge, ConceptMapEdge } from "@/lib/study/concept-ma
 
 interface Props {
   chapter: StudyChapter
+  /** Voir speed-round.tsx — appelé une fois toutes les relations trouvées. */
+  onComplete?: () => void
 }
 
 interface Point {
@@ -75,7 +77,7 @@ function labelPoint(from: Point, to: Point, spread: number): Point {
  * une relation structurelle ne se prête pas à la pression du temps. Score
  * basé sur le nombre d'essais ratés.
  */
-export function ConceptMap({ chapter }: Props) {
+export function ConceptMap({ chapter, onComplete }: Props) {
   const [challenge, setChallenge] = useState<ConceptMapChallenge | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -118,8 +120,9 @@ export function ConceptMap({ chapter }: Props) {
   useEffect(() => {
     if (finished) {
       recordExerciseAttempt(chapter.id, "conceptMap", attempts === totalEdges)
+      onComplete?.()
     }
-  }, [finished, attempts, totalEdges, chapter.id])
+  }, [finished, attempts, totalEdges, chapter.id, onComplete])
 
   // Efface le flash rouge après un court délai, sans bloquer d'autres clics.
   useEffect(() => {

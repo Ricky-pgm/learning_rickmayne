@@ -14,6 +14,8 @@ import type { BugHuntChallenge } from "@/lib/study/bug-hunt-prompt"
 
 interface Props {
   chapter: StudyChapter
+  /** Voir speed-round.tsx — appelé une fois le bug réellement trouvé. */
+  onComplete?: () => void
 }
 
 /**
@@ -24,7 +26,7 @@ interface Props {
  * sur le nombre d'essais, pas la vitesse, dans le même esprit que
  * MemoryMatch (moves) plutôt que SpeedRound (secondsLeft).
  */
-export function BugHunt({ chapter }: Props) {
+export function BugHunt({ chapter, onComplete }: Props) {
   const [challenge, setChallenge] = useState<BugHuntChallenge | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -61,8 +63,9 @@ export function BugHunt({ chapter }: Props) {
   useEffect(() => {
     if (foundIndex !== null) {
       recordExerciseAttempt(chapter.id, "bugHunt", wrongGuesses.length === 0)
+      onComplete?.()
     }
-  }, [foundIndex, wrongGuesses.length, chapter.id])
+  }, [foundIndex, wrongGuesses.length, chapter.id, onComplete])
 
   function handleLineClick(index: number) {
     if (!challenge || foundIndex !== null || wrongGuesses.includes(index)) return

@@ -55,6 +55,20 @@ export default function StudyChapterPage({
   // n'est pas conditionné par la sélection côté base-ui), ce qui
   // déclencherait un appel API par exercice au lieu d'un seul.
   const [visitedExercises, setVisitedExercises] = useState<Set<string>>(new Set())
+  // Distinct de visitedExercises : celui-ci sert UNIQUEMENT à garder un
+  // exercice monté pour ne pas perdre sa progression au changement
+  // d'onglet — il se remplit dès qu'un onglet est ouvert, pas quand
+  // l'exercice est réellement fini. completedExercises, lui, ne se
+  // remplit que via le callback onComplete de chaque exercice (une fois
+  // le défi réellement réussi) — c'est le seul des deux qui doit compter
+  // pour la phase "S'entraîner" (voir phasesDone plus bas). Avant cette
+  // distinction, ouvrir simplement l'onglet Speed Round suffisait à
+  // marquer la phase comme faite sans avoir répondu à une question.
+  const [completedExercises, setCompletedExercises] = useState<Set<string>>(new Set())
+
+  function markExerciseCompleted(type: string) {
+    setCompletedExercises(prev => prev.has(type) ? prev : new Set(prev).add(type))
+  }
   // Signale l'avancement réel dans chaque phase — purement visuel (voir
   // StudyPhase), remis à zéro à chaque montage donc pas persisté : rouvrir
   // le chapitre plus tard montre à nouveau les trois phases "à faire",
@@ -108,12 +122,12 @@ export default function StudyChapterPage({
   // recalculé ici plutôt qu'à partir de la variable phasesDone plus bas
   // (dérivée après les early-returns) pour rester un Hook inconditionnel.
   useEffect(() => {
-    const done = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (visitedExercises.size > 0 ? 1 : 0)
+    const done = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (completedExercises.size > 0 ? 1 : 0)
     if (done >= 3 && !celebrationShown) {
       setShowCelebration(true)
       setCelebrationShown(true)
     }
-  }, [lessonOpened, flashcardsDone, visitedExercises, celebrationShown])
+  }, [lessonOpened, flashcardsDone, completedExercises, celebrationShown])
 
   if (loading) {
     return (
@@ -147,7 +161,7 @@ export default function StudyChapterPage({
   const totalChapters = allChapters.length
   const courseTitle = chapter.course_title
   const timeEstimate = estimateChapterTime(chapter.concepts.length, chapter.profile, chapter.has_code, realFlashcardCount)
-  const phasesDone = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (visitedExercises.size > 0 ? 1 : 0)
+  const phasesDone = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (completedExercises.size > 0 ? 1 : 0)
   const nextChapter = positionInCourse < totalChapters ? allChapters[positionInCourse] : null
 
   return (
@@ -288,7 +302,7 @@ export default function StudyChapterPage({
             title="S'entraîner"
             subtitle={`${playableSlots.length} exercice${playableSlots.length > 1 ? "s" : ""} adapté${playableSlots.length > 1 ? "s" : ""} à ce chapitre`}
             tone="success"
-            done={visitedExercises.size > 0}
+            done={completedExercises.size > 0}
           >
             <Tabs
               value={activeExercise}
@@ -325,12 +339,24 @@ export default function StudyChapterPage({
                   keepMounted={visitedExercises.has(slot.type)}
                   className="pt-4"
                 >
-                  {slot.type === "speedRound" && <SpeedRound chapter={chapter} lang={lang} />}
-                  {slot.type === "matching" && <MemoryMatch chapter={chapter} />}
-                  {slot.type === "bugHunt" && <BugHunt chapter={chapter} />}
-                  {slot.type === "conceptMap" && <ConceptMap chapter={chapter} />}
-                  {slot.type === "fillBlank" && <FillBlank chapter={chapter} />}
-                  {slot.type === "code" && <CodeComplete chapter={chapter} />}
+                  {slot.type === "speedRound" && (
+                    <SpeedRound chapter={chapter} lang={lang} onComplete={() => markExerciseCompleted(slot.type)} />
+                  )}
+                  {slot.type === "matching" && (
+                    <MemoryMatch chapter={chapter} onComplete={() => markExerciseCompleted(slot.type)} />
+                  )}
+                  {slot.type === "bugHunt" && (
+                    <BugHunt chapter={chapter} onComplete={() => markExerciseCompleted(slot.type)} />
+                  )}
+                  {slot.type === "conceptMap" && (
+                    <ConceptMap chapter={chapter} onComplete={() => markExerciseCompleted(slot.type)} />
+                  )}
+                  {slot.type === "fillBlank" && (
+                    <FillBlank chapter={chapter} onComplete={() => markExerciseCompleted(slot.type)} />
+                  )}
+                  {slot.type === "code" && (
+                    <CodeComplete chapter={chapter} onComplete={() => markExerciseCompleted(slot.type)} />
+                  )}
                 </TabsContent>
               ))}
             </Tabs>

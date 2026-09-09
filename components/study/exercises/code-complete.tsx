@@ -13,6 +13,8 @@ import type { CodeCompleteChallenge } from "@/lib/study/code-complete-prompt"
 
 interface Props {
   chapter: StudyChapter
+  /** Voir speed-round.tsx — appelé une fois la bonne ligne trouvée. */
+  onComplete?: () => void
 }
 
 /**
@@ -22,7 +24,7 @@ interface Props {
  * bonne ligne pour compléter un trou. Sans chrono, score au nombre
  * d'essais, cohérent avec les autres mini-jeux sans pression de temps.
  */
-export function CodeComplete({ chapter }: Props) {
+export function CodeComplete({ chapter, onComplete }: Props) {
   const [challenge, setChallenge] = useState<CodeCompleteChallenge | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -59,8 +61,9 @@ export function CodeComplete({ chapter }: Props) {
   useEffect(() => {
     if (solved) {
       recordExerciseAttempt(chapter.id, "code", wrongIndices.length === 0)
+      onComplete?.()
     }
-  }, [solved, wrongIndices.length, chapter.id])
+  }, [solved, wrongIndices.length, chapter.id, onComplete])
 
   function handleOptionClick(index: number) {
     if (!challenge || solved || wrongIndices.includes(index)) return
