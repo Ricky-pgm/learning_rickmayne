@@ -28,12 +28,49 @@ interface FoundEdge extends ConceptMapEdge {
   toPoint: Point
 }
 
-// Coordonnées en pourcentage (0-100) sur un cercle — layout stable quel
-// que soit le nombre de nœuds (4 à 8, voir concept-map-prompt.ts), pas
-// besoin d'une lib de graphes pour un si petit nombre de bulles.
-function layoutNodes(nodes: string[]): Record<string, Point> {
+/**
+ * Coordonnées en pourcentage (0-100) — pas besoin d'une lib de graphes
+ * pour 4-8 nœuds. Un simple cercle uniforme (ordre arbitraire de
+ * challenge.nodes) créait un vrai défaut visuel dès qu'un nœud avait
+ * plusieurs relations ("hub") : deux voisins de ce hub pouvaient finir
+ * alignés avec un troisième nœud non lié entre eux, et le trait qui les
+ * relie traversait alors visuellement ce nœud tiers (repéré sur un
+ * screenshot réel : "Innovation" barré par le trait Unternehmenserfolg
+ * → Sicherheit).
+ *
+ * Quand un hub existe (un nœud relié à au moins 3 autres), on bascule en
+ * layout étoile : le hub au centre exact du cercle, tous ses voisins
+ * répartis uniformément autour de lui. Un rayon qui part du centre ne
+ * peut alors plus, par construction géométrique, passer par-dessus un
+ * autre nœud du même cercle. Sans hub clair (arêtes dispersées entre
+ * plusieurs paires sans nœud dominant), on garde le cercle uniforme —
+ * le problème ne se pose pas dans ce cas.
+ */
+function layoutNodes(nodes: string[], edges: ConceptMapEdge[]): Record<string, Point> {
   const cx = 50, cy = 50, r = 38
   const positions: Record<string, Point> = {}
+
+  const degree = new Map<string, number>()
+  for (const e of edges) {
+    degree.set(e.from, (degree.get(e.from) ?? 0) + 1)
+    degree.set(e.to, (degree.get(e.to) ?? 0) + 1)
+  }
+  let hub: string | null = null
+  let hubDegree = 0
+  for (const [node, d] of degree) {
+    if (d > hubDegree) { hub = node; hubDegree = d }
+  }
+
+  if (hub && hubDegree >= 3) {
+    positions[hub] = { x: cx, y: cy }
+    const others = nodes.filter(n => n !== hub)
+    others.forEach((node, i) => {
+      const angle = (i / others.length) * 2 * Math.PI - Math.PI / 2
+      positions[node] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) }
+    })
+    return positions
+  }
+
   nodes.forEach((node, i) => {
     const angle = (i / nodes.length) * 2 * Math.PI - Math.PI / 2
     positions[node] = {
@@ -159,7 +196,7 @@ export function ConceptMap({ chapter, onComplete }: Props) {
     Promise.resolve().then(() => load())
   }, [load])
 
-  const positions = useMemo(() => (challenge ? layoutNodes(challenge.nodes) : {}), [challenge])
+  const positions = useMemo(() => (challenge ? layoutNodes(challenge.nodes, challenge.edges) : {}), [challenge])
   const totalEdges = challenge?.edges.length ?? 0
   const finished = totalEdges > 0 && foundEdges.length === totalEdges
 
