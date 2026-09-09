@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
@@ -41,6 +41,15 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [streak, setStreak] = useState(0)
+  // La carte utilise un flip 3D en position absolute (chaque face occupe
+  // exactement la hauteur du conteneur) — avec une hauteur fixe, un verso
+  // plus long que le recto se faisait couper au lieu de s'afficher en
+  // entier. cardHeight mesure la face la plus haute des deux (recto et
+  // verso, même quand seul le verso est visible : la face cachée reste
+  // montée sous le flip) et devient la hauteur réelle du conteneur.
+  const frontRef = useRef<HTMLDivElement>(null)
+  const backRef = useRef<HTMLDivElement>(null)
+  const [cardHeight, setCardHeight] = useState(176) // 176px = min-h-44 d'origine, comme plancher
 
   const loadCards = useCallback(async (forceRegenerate = false) => {
     setLoading(true)
@@ -118,6 +127,27 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
       return next
     })
   }
+
+  // Remesure à chaque nouvelle carte (recto/verso différents) et sur
+  // tout changement de largeur (le texte re-wrap, donc la hauteur change)
+  // — ResizeObserver plutôt qu'un effet sur [index] seul, pour rester
+  // correct aussi en redimensionnant la fenêtre.
+  useEffect(() => {
+    const front = frontRef.current
+    const back = backRef.current
+    if (!front || !back) return
+
+    function measure() {
+      const height = Math.max(front!.scrollHeight, back!.scrollHeight, 176)
+      setCardHeight(height)
+    }
+    measure()
+
+    const observer = new ResizeObserver(measure)
+    observer.observe(front)
+    observer.observe(back)
+    return () => observer.disconnect()
+  }, [index, cards])
 
   if (!started) {
     return (
@@ -219,12 +249,12 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
           (backface-visibility: hidden le cache), pas de bascule de contenu
           instantanée comme avant. */}
       <div
-        className="min-h-44 cursor-pointer"
-        style={{ perspective: "1200px" }}
+        className="cursor-pointer transition-[height] duration-200"
+        style={{ perspective: "1200px", height: cardHeight }}
         onClick={() => setFlipped(f => !f)}
       >
         <div
-          className="relative min-h-44 transition-transform duration-500 ease-out"
+          className="relative h-full transition-transform duration-500 ease-out"
           style={{
             transformStyle: "preserve-3d",
             transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
@@ -232,7 +262,8 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
         >
           {/* Front */}
           <Card
-            className="absolute inset-0 min-h-44 border border-border/70 bg-card shadow-none hover:border-ring/40"
+            ref={frontRef}
+            className="absolute inset-0 h-full min-h-44 border border-border/70 bg-card shadow-none hover:border-ring/40"
             style={{ backfaceVisibility: "hidden" }}
           >
             <CardContent className="flex min-h-44 flex-col items-center justify-center gap-4 p-6 text-center">
@@ -243,7 +274,8 @@ export function FlashcardReview({ chapter, onSeriesComplete }: Props) {
 
           {/* Back */}
           <Card
-            className="absolute inset-0 min-h-44 border border-ring/40 bg-ring/5 shadow-none"
+            ref={backRef}
+            className="absolute inset-0 h-full min-h-44 border border-ring/40 bg-ring/5 shadow-none"
             style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
           >
             <CardContent className="flex min-h-44 flex-col items-center justify-center gap-4 p-6 text-center">
