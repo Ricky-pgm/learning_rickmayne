@@ -104,19 +104,29 @@ export default function EtudeDashboardPage() {
     setCelebratingMilestone(null)
   }
 
-  const dueChapters = useMemo(
-    () => chapters.filter(c => c.next_review && new Date(c.next_review) <= new Date()),
+  // Les chapitres organisationnels (plan de semestre, modalités d'examen...)
+  // n'ont ni flashcards ni exercices — leur mastery_pct reste toujours à 0
+  // sans que ça signifie "jamais exploré". Sans ce filtre, un plan de
+  // semestre atterrirait dans "Pas encore explorés" et pourrait même
+  // devenir la recommandation "Pour toi" avec un exercice inventé dessus.
+  const contentChapters = useMemo(
+    () => chapters.filter(c => !c.is_organizational),
     [chapters],
+  )
+
+  const dueChapters = useMemo(
+    () => contentChapters.filter(c => c.next_review && new Date(c.next_review) <= new Date()),
+    [contentChapters],
   )
 
   const neverExplored = useMemo(
-    () => chapters.filter(c => c.mastery_pct === 0),
-    [chapters],
+    () => contentChapters.filter(c => c.mastery_pct === 0),
+    [contentChapters],
   )
 
   const inProgress = useMemo(
-    () => chapters.filter(c => c.mastery_pct > 0 && c.mastery_pct < 100),
-    [chapters],
+    () => contentChapters.filter(c => c.mastery_pct > 0 && c.mastery_pct < 100),
+    [contentChapters],
   )
 
   // Chapitre le plus prioritaire (même ordre que les sections ci-dessous :
@@ -153,7 +163,7 @@ export default function EtudeDashboardPage() {
 
   const courseSummaries = useMemo(() => {
     const map = new Map<string, CourseSummary>()
-    for (const c of chapters) {
+    for (const c of contentChapters) {
       if (!map.has(c.study_course_id)) {
         map.set(c.study_course_id, {
           courseId: c.study_course_id,
@@ -167,13 +177,13 @@ export default function EtudeDashboardPage() {
       if (c.mastery_pct === 100) s.doneCount++
     }
     return Array.from(map.values())
-  }, [chapters])
+  }, [contentChapters])
 
   const totalMastery = useMemo(() => {
-    if (chapters.length === 0) return 0
-    const sum = chapters.reduce((acc, c) => acc + c.mastery_pct, 0)
-    return Math.round(sum / chapters.length)
-  }, [chapters])
+    if (contentChapters.length === 0) return 0
+    const sum = contentChapters.reduce((acc, c) => acc + c.mastery_pct, 0)
+    return Math.round(sum / contentChapters.length)
+  }, [contentChapters])
 
   if (loading) {
     return (
@@ -295,13 +305,13 @@ export default function EtudeDashboardPage() {
         <StatCard
           icon={<Flame className="h-5 w-5 text-warning" />}
           label="Chapitres"
-          value={chapters.length}
+          value={contentChapters.length}
           tone="default"
         />
         <StatCard
           icon={<CheckCircle className="h-5 w-5 text-success" />}
           label="Maîtrisés"
-          value={chapters.filter(c => c.mastery_pct === 100).length}
+          value={contentChapters.filter(c => c.mastery_pct === 100).length}
           tone="success"
         />
         <StatCard

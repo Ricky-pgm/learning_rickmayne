@@ -12,6 +12,7 @@ export interface IngestResult {
     summary: string
     has_code: boolean
     code_lang: Lang | null
+    is_organizational: boolean
   }[]
 }
 
@@ -31,10 +32,11 @@ export function buildIngestPrompt(): string {
 
 Pour chaque chapitre, identifie :
 - un titre concis en allemand ET en français
-- la liste des concepts clés abordés (mots ou courtes expressions)
+- la liste des concepts clés abordés (mots ou courtes expressions) — laisse vide si le chapitre est organisationnel (voir is_organizational ci-dessous)
 - un résumé de 2-4 phrases qui mentionne explicitement chacun des concepts listés
 - si le chapitre contient du code ou des exemples de syntaxe technique (has_code)
 - si oui, dans quel langage (code_lang) parmi : "java", "python", "perl", "javascript" — null si has_code est false ou si le langage n'en fait pas partie
+- is_organizational : true si ce "chapitre" est en réalité du contenu organisationnel plutôt que du contenu de cours à réviser — plan du semestre, calendrier des séances, modalités/dates d'examen, règles de présence, coordonnées de l'enseignant, barème de notation. Ce n'est PAS organisationnel : une introduction qui pose les enjeux du cours, un rappel de prérequis. Pour un chapitre organisationnel, le résumé doit rester court (1-2 phrases, l'essentiel seulement) et concepts doit être un tableau vide — ne fabrique pas de "concepts" artificiels juste pour remplir le champ.
 
 Détecte aussi le profil global du cours :
 - "programming" : cours de programmation (un langage précis domine)
@@ -47,7 +49,8 @@ Règles impératives :
 - Un chapitre = une unité thématique cohérente, ni trop fine (un seul concept) ni trop large (plusieurs thèmes non liés).
 - Numérote les chapitres à partir de 1, dans l'ordre d'apparition dans le document (même si ce document est une partie d'un support plus large — numérote uniquement ce que tu vois, en commençant à 1).
 - N'invente aucun contenu absent du document. Si une partie du document n'est pas un contenu de cours exploitable (page de garde, sommaire, bibliographie), ignore-la.
-- Chaque résumé doit mentionner par leur nom tous les concepts listés pour ce chapitre.
+- Le contenu organisationnel (voir is_organizational) n'est PAS ignoré comme une page de garde : il devient son propre chapitre, marqué is_organizational: true, avec un résumé court — jamais fusionné avec un chapitre de contenu, jamais transformé en exercices.
+- Chaque résumé doit mentionner par leur nom tous les concepts listés pour ce chapitre (sauf chapitre organisationnel, où concepts est vide).
 
 Réponds UNIQUEMENT avec du JSON valide, sans markdown, sans backticks :
 {
@@ -62,7 +65,8 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown, sans backticks :
       "concepts": ["concept1", "concept2"],
       "summary": "Résumé mentionnant concept1 et concept2 explicitement.",
       "has_code": true,
-      "code_lang": "java"
+      "code_lang": "java",
+      "is_organizational": false
     }
   ]
 }`

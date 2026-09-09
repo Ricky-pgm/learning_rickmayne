@@ -496,6 +496,22 @@ select id, public from storage.buckets where id = 'study-course-files';
 
 Si `rls_active = false` ou `nb_policies = 0` quelque part : ne pas lancer l'app dessus — ça exposerait les données de tous les utilisateurs entre eux.
 
+## 6bis. Chapitres organisationnels (plan de semestre, modalités d'examen...)
+
+Un PDF de cours contient souvent des pages qui ne sont pas du contenu à réviser : plan du semestre, règles de présence, modalités d'examen, contacts. Avant cette colonne, l'ingestion en faisait un chapitre comme un autre — avec concepts, flashcards, exercices — ce qui n'a pas de sens pédagogique.
+
+```sql
+alter table public.study_chapters add column if not exists is_organizational boolean not null default false;
+```
+
+Un chapitre marqué `is_organizational = true` :
+- reste numéroté et visible dans la liste des chapitres du cours (l'info existe, l'étudiant doit pouvoir la retrouver),
+- n'affiche que son résumé (pas de cours détaillé, pas de flashcards, pas d'exercices, pas d'estimation de temps, pas de bouton "Pour aller plus loin"),
+- est exclu de `mastery_pct`/`next_review` côté UI (n'entre jamais dans les stats de progression ni dans le streak),
+- n'a pas de code_lang/has_code pertinents (toujours `false`/`null` pour ce type de chapitre).
+
+`study_chapters.*` dans `study_chapters_with_progress` (§4) inclut automatiquement cette colonne — pas de migration de vue nécessaire.
+
 ## 7. Reste à faire (plus tard, pas maintenant)
 
 Reporter le SQL des §3/§4 dans `supabase/migrations/0003_study_mode.sql` (+ un `0005_study_progress_view.sql` séparé pour la vue), pour que `supabase db push` redevienne la source de vérité.

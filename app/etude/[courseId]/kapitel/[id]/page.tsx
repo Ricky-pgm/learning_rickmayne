@@ -11,6 +11,7 @@ import {
   PenLine,
   Link2,
   Network,
+  Info,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -154,10 +155,28 @@ export default function StudyChapterPage({
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-balance">{chapter.title}</h1>
           </div>
-          <TimeRing estimate={timeEstimate} phasesDone={phasesDone} className="flex-shrink-0" />
+          {/* Pas de temps à estimer pour un chapitre organisationnel — ce
+              n'est pas du contenu à réviser (voir docs/db-anpassung.md §6bis). */}
+          {!chapter.is_organizational && (
+            <TimeRing estimate={timeEstimate} phasesDone={phasesDone} className="flex-shrink-0" />
+          )}
         </div>
       </div>
 
+      {chapter.is_organizational ? (
+        /* Contenu organisationnel (plan de semestre, modalités d'examen,
+           contacts...) — juste le résumé, aucune des trois phases
+           d'apprentissage : pas de cours détaillé à générer, pas de
+           flashcards, pas d'exercices à inventer sur du non-contenu. */
+        <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 p-4">
+          <Info className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-muted-foreground">Information de cours</p>
+            <p className="text-sm leading-relaxed">{chapter.summary}</p>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Trois phases plutôt qu'une pile plate de blocs : l'étudiant qui
           arrive sur un chapitre voit dans quel ordre travailler
           (comprendre le contenu, puis le mémoriser, puis se tester)
@@ -287,6 +306,8 @@ export default function StudyChapterPage({
           </StudyPhase>
         )
       })()}
+      </>
+      )}
 
       {/* Navigation between chapters */}
       {totalChapters > 1 && (

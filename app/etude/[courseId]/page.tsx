@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertAction } from "@/components/ui/alert"
 import { Spinner } from "@/components/ui/spinner"
-import { ArrowLeft, ArrowRight, FileText, Sparkles, AlertCircle, CheckCircle2, BookOpen, Clock } from "lucide-react"
+import { ArrowLeft, ArrowRight, FileText, Sparkles, AlertCircle, CheckCircle2, BookOpen, Clock, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { getStudyCourse, listFiles, updateStudyCourseFileStatus, saveIngestResult, countStudyChapters, advanceNextSliceIndex } from "@/lib/study/queries"
@@ -176,8 +176,13 @@ export default function EtudeCoursePage() {
   }
 
   const pendingFiles = files.filter(f => f.status === "pending" || f.status === "error" || isStuckProcessing(f))
-  const masteredCount = chapters.filter(c => c.mastery_pct === 100).length
-  const dueCount = chapters.filter(c => c.next_review !== null && new Date(c.next_review) <= new Date()).length
+  // Les chapitres organisationnels (plan de semestre, modalités d'examen...)
+  // n'ont ni flashcards ni exercices — les compter dans "X/Y maîtrisés"
+  // gonflerait faussement le dénominateur avec des chapitres qui ne
+  // peuvent par nature jamais être "maîtrisés".
+  const contentChapters = chapters.filter(c => !c.is_organizational)
+  const masteredCount = contentChapters.filter(c => c.mastery_pct === 100).length
+  const dueCount = contentChapters.filter(c => c.next_review !== null && new Date(c.next_review) <= new Date()).length
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
@@ -276,7 +281,7 @@ export default function EtudeCoursePage() {
               Chapitres
             </p>
             <p className="text-xs text-muted-foreground tabular-nums">
-              {masteredCount}/{chapters.length} maîtrisés
+              {masteredCount}/{contentChapters.length} maîtrisés
               {dueCount > 0 && <span className="text-warning"> · {dueCount} à réviser</span>}
             </p>
           </div>
@@ -294,11 +299,16 @@ export default function EtudeCoursePage() {
                       <CardContent className="flex items-stretch gap-0 p-0">
                         {/* Bande d'état : lisible d'un coup d'œil sur une
                             liste longue (58 chapitres sur un cours réel),
-                            là où un pourcentage seul se noie. */}
+                            là où un pourcentage seul se noie. Neutre pour
+                            un chapitre organisationnel — il n'a pas
+                            d'état de maîtrise, ce n'est pas du contenu à
+                            réviser. */}
                         <div
                           className={cn(
                             "w-1 flex-shrink-0",
-                            isDue ? "bg-warning" : isMastered ? "bg-success" : ch.mastery_pct > 0 ? "bg-ring" : "bg-border",
+                            ch.is_organizational
+                              ? "bg-muted-foreground/20"
+                              : isDue ? "bg-warning" : isMastered ? "bg-success" : ch.mastery_pct > 0 ? "bg-ring" : "bg-border",
                           )}
                         />
                         <div className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3 sm:px-4">
@@ -308,9 +318,9 @@ export default function EtudeCoursePage() {
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <p className="truncate text-sm font-medium">{ch.title}</p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {ch.concepts.slice(0, 3).join(" · ")}
+                              {ch.is_organizational ? ch.summary : ch.concepts.slice(0, 3).join(" · ")}
                             </p>
-                            {ch.mastery_pct > 0 && (
+                            {!ch.is_organizational && ch.mastery_pct > 0 && (
                               <div className="h-1 w-full max-w-40 overflow-hidden rounded-full bg-muted">
                                 <div
                                   className={cn("h-full rounded-full", isMastered ? "bg-success" : "bg-ring")}
@@ -319,15 +329,23 @@ export default function EtudeCoursePage() {
                               </div>
                             )}
                           </div>
-                          {isDue && (
-                            <Badge variant="outline" className="flex-shrink-0 border-warning/40 text-xs text-warning">
-                              À réviser
+                          {ch.is_organizational ? (
+                            <Badge variant="outline" className="flex-shrink-0 text-xs text-muted-foreground">
+                              <Info className="h-3 w-3" /> Info
                             </Badge>
-                          )}
-                          {!isMastered && (
-                            <span className="hidden flex-shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
-                              <Clock className="h-3 w-3" /> ~{timeEstimate.totalMinutes} min
-                            </span>
+                          ) : (
+                            <>
+                              {isDue && (
+                                <Badge variant="outline" className="flex-shrink-0 border-warning/40 text-xs text-warning">
+                                  À réviser
+                                </Badge>
+                              )}
+                              {!isMastered && (
+                                <span className="hidden flex-shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
+                                  <Clock className="h-3 w-3" /> ~{timeEstimate.totalMinutes} min
+                                </span>
+                              )}
+                            </>
                           )}
                           <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                         </div>

@@ -55,6 +55,12 @@ export interface StudyChapter {
   /** Dupliqué depuis study_courses.profile par trigger DB — jamais à écrire à la main. */
   profile: CourseProfile
 
+  /** Contenu organisationnel (plan de semestre, modalités d'examen,
+   * contacts...) plutôt que du contenu de cours — voir
+   * docs/db-anpassung.md §6bis. N'a ni flashcards ni exercices ni cours
+   * détaillé, juste son résumé ; exclu des stats de progression. */
+  is_organizational: boolean
+
   source_file_id: string | null
   created_at: string
 }
