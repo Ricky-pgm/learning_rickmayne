@@ -147,7 +147,12 @@ export default function StudyChapterPage({
           <span className="text-foreground">Chapitre {positionInCourse}</span>
         </nav>
 
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        {/* sm:flex-row : sur mobile le titre reste seul en tête (priorité
+            de lecture), l'anneau de temps suit en dessous sur toute la
+            largeur plutôt que de se battre avec le titre pour la place —
+            à 375px, les deux côte à côte poussaient le titre en second
+            plan visuel malgré sa priorité réelle. */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="text-xs">{profileLabel}</Badge>
