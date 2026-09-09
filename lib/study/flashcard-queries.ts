@@ -120,6 +120,14 @@ export async function saveFlashcardProgress(
       ease_factor: state.easeFactor,
       due_at: state.dueAt,
       last_grade: grade,
+      // BUG CRITIQUE corrigé : reviews n'était jamais écrit ici alors que
+      // scheduleNext le calcule bien (reviews + 1) — la colonne restait
+      // donc à son default 0 pour toujours, quel que soit le nombre réel
+      // de révisions. study_chapters_with_progress filtre explicitement
+      // sur `p.reviews > 0` pour mastery_pct ET next_review : avec ce bug,
+      // AUCUNE carte ne pouvait jamais compter comme "maîtrisée" ni
+      // apparaître "à réviser", pour personne, peu importe l'usage réel.
+      reviews: state.reviews,
       updated_at: new Date().toISOString(),
     })
 

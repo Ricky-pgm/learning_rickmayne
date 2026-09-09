@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
-import { PenLine, RefreshCw, Trophy, CheckCircle2 } from "lucide-react"
+import { PenLine, RefreshCw, Trophy, CheckCircle2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { recordExerciseAttempt } from "@/lib/study/exercise-history-queries"
@@ -42,8 +42,11 @@ function shuffle<T>(arr: T[]): T[] {
 
 /**
  * Texte à trous — étiquettes à placer dans les blancs d'une explication
- * courte, en cliquant une étiquette puis un trou. Sans chrono, comme
- * BugHunt/ConceptMap : le score se base sur le nombre d'essais.
+ * courte, en cliquant une étiquette puis un trou. Placer tous les mots
+ * puis vérifier à la fin (bouton "Vérifier"), plutôt qu'une correction
+ * trou par trou : ça laisse le temps de remplir normalement et de changer
+ * d'avis (recliquer un trou rempli le libère) avant de savoir si c'est
+ * bon, au lieu de sanctionner chaque choix dans l'instant.
  */
 export function FillBlank({ chapter }: Props) {
   const [challenge, setChallenge] = useState<FillBlankChallenge | null>(null)
@@ -52,7 +55,9 @@ export function FillBlank({ chapter }: Props) {
   const [pool, setPool] = useState<string[]>([])
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [placed, setPlaced] = useState<Record<number, string>>({})
-  const [wrongBlank, setWrongBlank] = useState<number | null>(null)
+  // Devient true seulement après avoir cliqué "Vérifier" — avant ça, un
+  // trou rempli ne révèle rien sur sa justesse, il reste neutre.
+  const [checked, setChecked] = useState(false)
   const [attempts, setAttempts] = useState(0)
 
   const load = useCallback(async () => {
@@ -60,7 +65,7 @@ export function FillBlank({ chapter }: Props) {
     setError("")
     setSelectedTag(null)
     setPlaced({})
-    setWrongBlank(null)
+    setChecked(false)
     setAttempts(0)
     try {
       const res = await fetch("/api/study/fill-blank", {
@@ -86,35 +91,67 @@ export function FillBlank({ chapter }: Props) {
 
   const segments = useMemo(() => (challenge ? parseTemplate(challenge.text_template) : []), [challenge])
   const totalBlanks = challenge?.blanks.length ?? 0
-  const finished = totalBlanks > 0 && Object.keys(placed).length === totalBlanks
+  const allPlaced = totalBlanks > 0 && Object.keys(placed).length === totalBlanks
+  const correctCount = useMemo(() => {
+    if (!challenge) return 0
+    return Object.entries(placed).filter(([index, tag]) => challenge.blanks[Number(index)] === tag).length
+  }, [challenge, placed])
+  const finished = checked && correctCount === totalBlanks
 
   useEffect(() => {
-    if (finished) {
-      recordExerciseAttempt(chapter.id, "fillBlank", attempts === totalBlanks)
+    if (checked) {
+      recordExerciseAttempt(chapter.id, "fillBlank", correctCount === totalBlanks)
     }
-  }, [finished, attempts, totalBlanks, chapter.id])
-
-  useEffect(() => {
-    if (wrongBlank === null) return
-    const timer = setTimeout(() => setWrongBlank(null), 500)
-    return () => clearTimeout(timer)
-  }, [wrongBlank])
+  }, [checked, correctCount, totalBlanks, chapter.id])
 
   function handleTagClick(tag: string) {
-    if (finished) return
+    if (checked) return
     setSelectedTag(prev => (prev === tag ? null : tag))
   }
 
+  // Un trou vide reçoit l'étiquette sélectionnée ; un trou déjà rempli se
+  // libère et remet son étiquette dans le pool — permet de changer d'avis
+  // avant de vérifier, plutôt que d'être bloqué sur un premier choix.
   function handleBlankClick(index: number) {
-    if (!challenge || finished || placed[index] || !selectedTag) return
+    if (!challenge || checked) return
 
-    setAttempts(a => a + 1)
-    if (challenge.blanks[index] === selectedTag) {
-      setPlaced(prev => ({ ...prev, [index]: selectedTag }))
-      setPool(prev => prev.filter(t => t !== selectedTag))
-    } else {
-      setWrongBlank(index)
+    if (placed[index]) {
+      const tag = placed[index]
+      setPlaced(prev => {
+        const next = { ...prev }
+        delete next[index]
+        return next
+      })
+      setPool(prev => [...prev, tag])
+      return
     }
+
+    if (!selectedTag) return
+    setPlaced(prev => ({ ...prev, [index]: selectedTag }))
+    setPool(prev => prev.filter(t => t !== selectedTag))
+    setSelectedTag(null)
+  }
+
+  function handleCheck() {
+    if (!allPlaced) return
+    setAttempts(a => a + 1)
+    setChecked(true)
+  }
+
+  // Réessayer après une vérification ratée : ne remet en jeu que les
+  // trous incorrects, les bons restent acquis — sans ça, revenir en
+  // arrière effacerait aussi le travail déjà validé.
+  function handleRetry() {
+    if (!challenge) return
+    const stillWrong = Object.entries(placed).filter(([index, tag]) => challenge.blanks[Number(index)] !== tag)
+    const wrongTags = stillWrong.map(([, tag]) => tag)
+    setPlaced(prev => {
+      const next = { ...prev }
+      for (const [index] of stillWrong) delete next[Number(index)]
+      return next
+    })
+    setPool(prev => [...prev, ...wrongTags])
+    setChecked(false)
     setSelectedTag(null)
   }
 
@@ -150,10 +187,12 @@ export function FillBlank({ chapter }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between text-sm">
         <span className="flex items-center gap-1.5 text-muted-foreground">
-          <PenLine className="h-3.5 w-3.5" /> {Object.keys(placed).length} / {totalBlanks} trous
+          <PenLine className="h-3.5 w-3.5" /> {Object.keys(placed).length} / {totalBlanks} trous remplis
         </span>
-        {attempts > Object.keys(placed).length && (
-          <Badge variant="outline" className="text-xs">{attempts} essais</Badge>
+        {checked && (
+          <Badge variant="outline" className={cn("text-xs", correctCount === totalBlanks ? "border-success/40 text-success" : "border-warning/40 text-warning")}>
+            {correctCount} / {totalBlanks} corrects
+          </Badge>
         )}
       </div>
 
@@ -164,21 +203,27 @@ export function FillBlank({ chapter }: Props) {
               if (seg.type === "text") return <span key={i}>{seg.value}</span>
 
               const filled = placed[seg.index]
-              const isWrong = wrongBlank === seg.index
+              const isCorrect = checked && filled === challenge.blanks[seg.index]
+              const isIncorrect = checked && !!filled && !isCorrect
               return (
                 <button
                   key={i}
                   onClick={() => handleBlankClick(seg.index)}
-                  disabled={!!filled || finished}
+                  disabled={checked || (!filled && !selectedTag)}
                   className={cn(
-                    "mx-1 inline-block min-w-[4.5rem] rounded-md border px-2 py-0.5 align-baseline text-sm font-medium transition-all",
-                    filled && "border-success/40 bg-success/10 text-success",
-                    !filled && isWrong && "border-destructive/50 bg-destructive/10 text-destructive",
-                    !filled && !isWrong && selectedTag && "cursor-pointer border-ring/50 bg-ring/5 text-ring hover:bg-ring/10",
-                    !filled && !isWrong && !selectedTag && "border-dashed border-border text-muted-foreground",
+                    "mx-1 inline-flex items-center gap-1 min-w-[4.5rem] rounded-md border px-2 py-0.5 align-baseline text-sm font-medium transition-all",
+                    // Avant vérification : un trou rempli reste neutre
+                    // (pas de vert/rouge prématuré) — juste rempli ou pas,
+                    // et re-cliquable pour changer d'avis.
+                    !checked && filled && "cursor-pointer border-ring/40 bg-ring/5 text-foreground hover:border-destructive/40 hover:bg-destructive/5",
+                    !checked && !filled && selectedTag && "cursor-pointer border-ring/50 bg-ring/5 text-ring hover:bg-ring/10",
+                    !checked && !filled && !selectedTag && "border-dashed border-border text-muted-foreground",
+                    isCorrect && "border-success/40 bg-success/10 text-success",
+                    isIncorrect && "border-destructive/50 bg-destructive/10 text-destructive",
                   )}
                 >
                   {filled ?? "……"}
+                  {!checked && filled && <X className="h-3 w-3 opacity-50" />}
                 </button>
               )
             })}
@@ -186,49 +231,66 @@ export function FillBlank({ chapter }: Props) {
         </CardContent>
       </Card>
 
-      {!finished && (
-        <div className="flex flex-wrap gap-2">
-          {pool.map(tag => (
-            <button
-              key={tag}
-              onClick={() => handleTagClick(tag)}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
-                selectedTag === tag
-                  ? "scale-105 border-ring bg-ring/15 text-ring shadow-sm"
-                  : "border-border bg-card hover:border-ring/40 hover:bg-muted/40",
-              )}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
+      {!checked && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {pool.map(tag => (
+              <button
+                key={tag}
+                onClick={() => handleTagClick(tag)}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
+                  selectedTag === tag
+                    ? "scale-105 border-ring bg-ring/15 text-ring shadow-sm"
+                    : "border-border bg-card hover:border-ring/40 hover:bg-muted/40",
+                )}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Clique une étiquette puis un trou pour la placer. Un trou déjà rempli se reclique pour changer d&apos;avis.
+          </p>
+          <Button size="sm" className="gap-2" disabled={!allPlaced} onClick={handleCheck}>
+            <CheckCircle2 className="h-4 w-4" /> Vérifier
+          </Button>
+        </>
       )}
 
-      {finished && (
-        <Card className="border border-success/30 bg-success/5 shadow-none">
+      {checked && (
+        <Card className={cn("border shadow-none", finished ? "border-success/30 bg-success/5" : "border-warning/30 bg-warning/5")}>
           <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
             <div className={cn(
               "flex h-14 w-14 items-center justify-center rounded-full",
-              attempts === totalBlanks ? "bg-success/10" : "bg-ring/10",
+              finished ? "bg-success/10" : "bg-warning/10",
             )}>
-              {attempts === totalBlanks ? (
+              {finished ? (
                 <Trophy className="h-7 w-7 text-success" />
               ) : (
-                <CheckCircle2 className="h-7 w-7 text-ring" />
+                <CheckCircle2 className="h-7 w-7 text-warning" />
               )}
             </div>
             <div>
               <p className="text-lg font-semibold">
-                {attempts === totalBlanks ? "Texte complété sans erreur !" : "Texte complété !"}
+                {finished ? "Texte complété sans erreur !" : `${correctCount} / ${totalBlanks} corrects`}
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                {totalBlanks} mots placés en {attempts} essai{attempts > 1 ? "s" : ""}
+                {finished
+                  ? `${totalBlanks} mots bien placés en ${attempts} vérification${attempts > 1 ? "s" : ""}`
+                  : "Les mots corrects restent en vert, réessaie les autres."}
               </p>
             </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={load}>
-              <RefreshCw className="h-4 w-4" /> Nouveau texte
-            </Button>
+            <div className="flex gap-2">
+              {!finished && (
+                <Button size="sm" className="gap-2" onClick={handleRetry}>
+                  <RefreshCw className="h-4 w-4" /> Réessayer
+                </Button>
+              )}
+              <Button variant="outline" size="sm" className="gap-2" onClick={load}>
+                <RefreshCw className="h-4 w-4" /> Nouveau texte
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

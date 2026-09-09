@@ -382,29 +382,59 @@ create policy "study_web_enrichment_via_chapter"
 Calculées à la volée depuis `study_flashcards_progress`, pas stockées —
 sinon désynchronisation garantie après chaque révision.
 
+**Révision (§6ter)** : `mastery_pct` ne comptait au départ QUE les
+flashcards — un chapitre entièrement pratiqué via Speed Round/Carte de
+concepts/Memory/Bug Hunt/Texte à trous, sans jamais ouvrir la Lernkartei,
+restait pour toujours à 0% de maîtrise. La vue combine maintenant les deux
+signaux (flashcards ET exercices) en prenant le plus favorable des deux —
+un vrai travail effectué dans n'importe quel mode compte, sans forcer
+personne à passer par les flashcards spécifiquement.
+
 ```sql
 create or replace view public.study_chapters_with_progress as
 select
   c.*,
-  coalesce(
-    round(
-      100.0 * count(*) filter (
-        where p.reviews > 0 and p.ease_factor >= 2.5 and p.last_grade in ('good', 'easy')
-      ) / nullif(count(f.id), 0)
+  greatest(
+    coalesce(
+      round(
+        100.0 * count(distinct f.id) filter (
+          where p.reviews > 0 and p.ease_factor >= 2.5 and p.last_grade in ('good', 'easy')
+        ) / nullif(count(distinct f.id), 0)
+      ),
+      0
     ),
-    0
+    coalesce(ex.exercise_mastery_pct, 0)
   )::int as mastery_pct,
   min(p.due_at) filter (where p.reviews > 0) as next_review
 from public.study_chapters c
 left join public.study_flashcards f on f.study_chapter_id = c.id
 left join public.study_flashcards_progress p
   on p.flashcard_id = f.id and p.user_id = c.user_id
-group by c.id;
+left join lateral (
+  -- Signal de maîtrise par exercices — seulement si au moins 3 réponses
+  -- ont été enregistrées pour ce chapitre (une seule bonne réponse
+  -- chanceuse ne doit pas afficher 100%), sur les 10 réponses les plus
+  -- récentes seulement (le niveau reflète la pratique récente, pas la
+  -- toute première tentative d'il y a des semaines).
+  select
+    case when count(*) >= 3
+      then round(100.0 * count(*) filter (where h.correct) / count(*))
+      else null
+    end as exercise_mastery_pct
+  from (
+    select correct
+    from public.study_exercise_history
+    where study_chapter_id = c.id and user_id = c.user_id
+    order by answered_at desc
+    limit 10
+  ) h
+) ex on true
+group by c.id, ex.exercise_mastery_pct;
 ```
 
 | Champ | Calcul | `null`/`0` quand |
 |---|---|---|
-| `mastery_pct` | % de cartes avec dernière note "good"/"easy" et `ease_factor >= 2.5` | `0` si aucune carte encore révisée |
+| `mastery_pct` | Le plus favorable entre : % de cartes "good"/"easy" (flashcards), et % de bonnes réponses sur les 10 dernières réponses d'exercice (si ≥ 3 réponses) | `0` si aucune carte révisée ET moins de 3 réponses d'exercice |
 | `next_review` | Échéance la plus proche parmi les cartes déjà révisées | `null` si aucune carte encore révisée |
 
 RLS hérité automatiquement de `study_chapters` — pas de policy à ajouter sur la vue.
@@ -511,6 +541,58 @@ Un chapitre marqué `is_organizational = true` :
 - n'a pas de code_lang/has_code pertinents (toujours `false`/`null` pour ce type de chapitre).
 
 `study_chapters.*` dans `study_chapters_with_progress` (§4) inclut automatiquement cette colonne — pas de migration de vue nécessaire.
+
+## 6ter. Fix `reviews` jamais écrit + maîtrise par exercices
+
+**À exécuter** — deux problèmes trouvés en usage réel (chapitre pratiqué via Carte de concepts, maîtrise restée à 0% après un chapitre visiblement fini) :
+
+1. `saveFlashcardProgress` (lib/study/flashcard-queries.ts) faisait un `upsert` sans jamais inclure `reviews` — la colonne restait à son `default 0` pour toujours, quel que soit le nombre réel de révisions. Bug corrigé côté code (`reviews: state.reviews` ajouté à l'upsert), rien à migrer en base pour ce point : les lignes déjà écrites avec `reviews = 0` se corrigeront de fait à la prochaine notation de chacune de ces cartes.
+2. `mastery_pct` ne comptait que les flashcards — jamais les exercices (Speed Round, Carte, Memory, Bug Hunt, Texte à trous). Un chapitre pratiqué uniquement via ces modes restait à 0% même sans le bug ci-dessus. La vue `study_chapters_with_progress` du §4 a été réécrite pour combiner les deux signaux (le plus favorable des deux) — **remplacer la vue existante par la nouvelle définition du §4** :
+
+```sql
+-- Recolle exactement la définition du §4 ci-dessus (create or replace,
+-- donc sans risque de doublon) :
+create or replace view public.study_chapters_with_progress as
+select
+  c.*,
+  greatest(
+    coalesce(
+      round(
+        100.0 * count(distinct f.id) filter (
+          where p.reviews > 0 and p.ease_factor >= 2.5 and p.last_grade in ('good', 'easy')
+        ) / nullif(count(distinct f.id), 0)
+      ),
+      0
+    ),
+    coalesce(ex.exercise_mastery_pct, 0)
+  )::int as mastery_pct,
+  min(p.due_at) filter (where p.reviews > 0) as next_review
+from public.study_chapters c
+left join public.study_flashcards f on f.study_chapter_id = c.id
+left join public.study_flashcards_progress p
+  on p.flashcard_id = f.id and p.user_id = c.user_id
+left join lateral (
+  select
+    case when count(*) >= 3
+      then round(100.0 * count(*) filter (where h.correct) / count(*))
+      else null
+    end as exercise_mastery_pct
+  from (
+    select correct
+    from public.study_exercise_history
+    where study_chapter_id = c.id and user_id = c.user_id
+    order by answered_at desc
+    limit 10
+  ) h
+) ex on true
+group by c.id, ex.exercise_mastery_pct;
+
+-- Ré-applique le security_invoker (§4bis) — create or replace le remet
+-- au comportement par défaut, à refaire chaque fois que la vue change :
+alter view public.study_chapters_with_progress set (security_invoker = true);
+```
+
+Vérification : jouer un exercice sur un chapitre jusqu'à 3 bonnes réponses (n'importe quel type), revenir sur la page cours — `mastery_pct` doit refléter ce travail sans avoir touché aux flashcards.
 
 ## 7. Reste à faire (plus tard, pas maintenant)
 

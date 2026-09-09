@@ -19,7 +19,10 @@ interface Props {
   lang: Lang
 }
 
-const SECONDS_PER_QUESTION = 12
+// 12s se voulait "speed" mais ne laissait pas le temps de lire l'énoncé
+// ET les 3-4 options avant de choisir sur une question technique — 18s
+// garde la pression du chrono sans transformer l'exercice en réflexe pur.
+const SECONDS_PER_QUESTION = 18
 
 interface ShuffledQuestion extends SpeedRoundQuestion {
   options: string[]

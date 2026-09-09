@@ -47,6 +47,28 @@ function edgeKey(from: string, to: string) {
 }
 
 /**
+ * Point d'ancrage du label d'une relation — décalé perpendiculairement au
+ * segment plutôt que posé pile sur son milieu. Sur un layout circulaire à
+ * 4-8 nœuds, plusieurs relations partent souvent d'un même sommet
+ * (ex. "Hardware" relié à 3 autres concepts) : leurs milieux de segment
+ * tombent tous près de ce sommet et les libellés textuels se chevauchent
+ * illisiblement. `spread` (0, 1, 2...) écarte les libellés d'un même
+ * groupe de relations qui se chevaucheraient sinon.
+ */
+function labelPoint(from: Point, to: Point, spread: number): Point {
+  const mx = (from.x + to.x) / 2
+  const my = (from.y + to.y) / 2
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const len = Math.hypot(dx, dy) || 1
+  // Perpendiculaire unitaire au segment.
+  const px = -dy / len
+  const py = dx / len
+  const offset = 4 + spread * 5
+  return { x: mx + px * offset, y: my + py * offset }
+}
+
+/**
  * Carte des concepts — relier deux concepts par un trait pour retrouver
  * les relations attendues entre eux (pas concept -> définition, déjà
  * couvert par MemoryMatch). Sans chrono, comme BugHunt : la réflexion sur
@@ -182,25 +204,45 @@ export function ConceptMap({ chapter }: Props) {
         <CardContent className="p-3 sm:p-5">
           <div className="relative aspect-square w-full max-w-md mx-auto">
             <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100">
-              {foundEdges.map((e, i) => (
-                <g key={i}>
-                  <line
-                    x1={e.fromPoint.x} y1={e.fromPoint.y}
-                    x2={e.toPoint.x} y2={e.toPoint.y}
-                    className="stroke-success"
-                    strokeWidth="0.6"
-                  />
-                  <text
-                    x={(e.fromPoint.x + e.toPoint.x) / 2}
-                    y={(e.fromPoint.y + e.toPoint.y) / 2}
-                    textAnchor="middle"
-                    className="fill-success"
-                    style={{ fontSize: "2.6px", fontWeight: 600 }}
-                  >
-                    {e.relation_fr}
-                  </text>
-                </g>
-              ))}
+              {foundEdges.map((e, i) => {
+                const label = labelPoint(e.fromPoint, e.toPoint, i)
+                // Largeur approximative du fond, calée sur la longueur du
+                // texte — un fond trop étroit laisserait les extrémités du
+                // libellé se mélanger aux traits qui passent derrière.
+                const labelWidth = Math.min(38, 3 + e.relation_fr.length * 1.7)
+                return (
+                  <g key={i}>
+                    <line
+                      x1={e.fromPoint.x} y1={e.fromPoint.y}
+                      x2={e.toPoint.x} y2={e.toPoint.y}
+                      className="stroke-success"
+                      strokeWidth="0.6"
+                    />
+                    {/* Fond derrière le texte : sans lui, un trait ou un
+                        autre libellé qui passe juste derrière rendait le
+                        texte illisible dès que deux relations se croisaient. */}
+                    <rect
+                      x={label.x - labelWidth / 2}
+                      y={label.y - 2.2}
+                      width={labelWidth}
+                      height="4.4"
+                      rx="1.2"
+                      className="fill-card"
+                      opacity="0.92"
+                    />
+                    <text
+                      x={label.x}
+                      y={label.y}
+                      dominantBaseline="middle"
+                      textAnchor="middle"
+                      className="fill-success"
+                      style={{ fontSize: "2.6px", fontWeight: 600 }}
+                    >
+                      {e.relation_fr}
+                    </text>
+                  </g>
+                )
+              })}
               {wrongFlash && (
                 <line
                   x1={positions[wrongFlash[0]]?.x} y1={positions[wrongFlash[0]]?.y}
