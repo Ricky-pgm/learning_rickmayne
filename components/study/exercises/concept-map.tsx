@@ -49,24 +49,70 @@ function edgeKey(from: string, to: string) {
 }
 
 /**
- * Point d'ancrage du label d'une relation — décalé perpendiculairement au
- * segment plutôt que posé pile sur son milieu. Sur un layout circulaire à
- * 4-8 nœuds, plusieurs relations partent souvent d'un même sommet
- * (ex. "Hardware" relié à 3 autres concepts) : leurs milieux de segment
- * tombent tous près de ce sommet et les libellés textuels se chevauchent
- * illisiblement. `spread` (0, 1, 2...) écarte les libellés d'un même
- * groupe de relations qui se chevaucheraient sinon.
+ * Pour chaque arête trouvée, détermine son "hub" (le nœud partagé avec le
+ * plus d'autres arêtes trouvées parmi from/to) et son rang parmi les
+ * arêtes de ce hub — alimente labelPoint pour répartir les labels le long
+ * de chaque segment plutôt que de les empiler tous au même endroit.
  */
-function labelPoint(from: Point, to: Point, spread: number): Point {
-  const mx = (from.x + to.x) / 2
-  const my = (from.y + to.y) / 2
+function computeEdgeRanks(edges: FoundEdge[]): { rank: number; rankTotal: number }[] {
+  const degree = new Map<string, number>()
+  for (const e of edges) {
+    degree.set(e.from, (degree.get(e.from) ?? 0) + 1)
+    degree.set(e.to, (degree.get(e.to) ?? 0) + 1)
+  }
+
+  const hubOf = edges.map(e => {
+    const fromDeg = degree.get(e.from) ?? 0
+    const toDeg = degree.get(e.to) ?? 0
+    return fromDeg >= toDeg ? e.from : e.to
+  })
+
+  const seenPerHub = new Map<string, number>()
+  const totalPerHub = new Map<string, number>()
+  for (const hub of hubOf) totalPerHub.set(hub, (totalPerHub.get(hub) ?? 0) + 1)
+
+  return hubOf.map(hub => {
+    const rank = seenPerHub.get(hub) ?? 0
+    seenPerHub.set(hub, rank + 1)
+    return { rank, rankTotal: totalPerHub.get(hub) ?? 1 }
+  })
+}
+
+/**
+ * Point d'ancrage du label d'une relation. Un layout circulaire à 4-8
+ * nœuds a souvent un "hub" relié à 3-5 autres concepts (ex.
+ * "Unternehmenserfolg" au centre relié à Effizienz/Sicherheit/
+ * Innovation/Skalierung) : si chaque label se pose au même point fixe du
+ * segment (le milieu), tous les libellés partant de ce hub s'écrasent au
+ * même endroit, illisibles. Deux leviers combinés pour les séparer :
+ * - `t` : position le long du segment (0 = début, 1 = fin) — variée selon
+ *   le rang de cette arête parmi les autres arêtes du MÊME nœud hub,
+ *   plutôt que fixée à 0.5 pour toutes. Rapprocher chaque label de "from"
+ *   dans une position différente les étale visuellement le long de
+ *   chaque trait au lieu de les empiler au centre commun.
+ * - un léger décalage perpendiculaire, réduit par rapport à avant (la
+ *   variation de `t` fait déjà la majeure partie du travail de séparation).
+ *
+ * @param rank position de cette arête parmi les arêtes du hub (0, 1, 2...)
+ * @param rankTotal nombre total d'arêtes partageant ce hub
+ */
+function labelPoint(from: Point, to: Point, rank: number, rankTotal: number): Point {
+  // Étale t entre 0.3 et 0.7 selon le rang — jamais pile au centre (0.5)
+  // pour une seule arête isolée non plus, pour rester cohérent avec le
+  // texte qui doit rester lisible au-dessus de la bulle "from".
+  const t = rankTotal <= 1 ? 0.5 : 0.3 + (rank / (rankTotal - 1)) * 0.4
+  const mx = from.x + (to.x - from.x) * t
+  const my = from.y + (to.y - from.y) * t
   const dx = to.x - from.x
   const dy = to.y - from.y
   const len = Math.hypot(dx, dy) || 1
-  // Perpendiculaire unitaire au segment.
   const px = -dy / len
   const py = dx / len
-  const offset = 4 + spread * 5
+  // Alterne le côté du trait selon la parité du rang — sans ça, des
+  // labels voisins sur des `t` proches mais du même côté peuvent encore
+  // se toucher.
+  const side = rank % 2 === 0 ? 1 : -1
+  const offset = 3.5 * side
   return { x: mx + px * offset, y: my + py * offset }
 }
 
@@ -192,6 +238,18 @@ export function ConceptMap({ chapter, onComplete }: Props) {
     )
   }
 
+  // Recalculé à chaque rendu — coût négligeable (4-8 nœuds, au plus une
+  // poignée d'arêtes) — plutôt qu'un useMemo qui ajouterait une
+  // dépendance à surveiller pour un calcul aussi léger.
+  const edgeRanks = computeEdgeRanks(foundEdges)
+  // Le rayon du cercle (layoutNodes) est fixe en unités SVG — avec 7-8
+  // nœuds au lieu de 4-5, l'espace angulaire entre bulles voisines
+  // diminue mécaniquement, donc des bulles de largeur fixe se
+  // chevauchaient (texte de deux concepts distincts fusionné
+  // visuellement). La largeur max des bulles diminue avec le nombre de
+  // nœuds plutôt que de rester fixe.
+  const nodeMaxWidthPx = challenge.nodes.length <= 5 ? 120 : challenge.nodes.length <= 6 ? 100 : 84
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-sm">
@@ -208,7 +266,8 @@ export function ConceptMap({ chapter, onComplete }: Props) {
           <div className="relative aspect-square w-full max-w-md mx-auto">
             <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100">
               {foundEdges.map((e, i) => {
-                const label = labelPoint(e.fromPoint, e.toPoint, i)
+                const { rank, rankTotal } = edgeRanks[i]
+                const label = labelPoint(e.fromPoint, e.toPoint, rank, rankTotal)
                 // Largeur approximative du fond, calée sur la longueur du
                 // texte — un fond trop étroit laisserait les extrémités du
                 // libellé se mélanger aux traits qui passent derrière.
@@ -273,9 +332,9 @@ export function ConceptMap({ chapter, onComplete }: Props) {
                   key={node}
                   onClick={() => handleNodeClick(node)}
                   disabled={finished}
-                  style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                  style={{ left: `${pos.x}%`, top: `${pos.y}%`, maxWidth: nodeMaxWidthPx }}
                   className={cn(
-                    "absolute max-w-[7.5rem] -translate-x-1/2 -translate-y-1/2 rounded-full border px-2.5 py-1.5 text-center text-[11px] font-medium leading-tight transition-all sm:text-xs",
+                    "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-2.5 py-1.5 text-center text-[11px] font-medium leading-tight transition-all sm:text-xs",
                     isSelected && "scale-105 border-ring bg-ring/15 text-ring shadow-sm",
                     !isSelected && isConnected && "border-success/40 bg-success/10 text-success",
                     !isSelected && !isConnected && "border-border bg-card hover:border-ring/40 hover:bg-muted/40",
