@@ -17,27 +17,38 @@ const MAX_BLANKS = 3
  * (pas de saisie libre, voir components/study/exercises/fill-blank.tsx —
  * évite la frustration d'une formulation proche mais jugée fausse).
  * Génération Haiku, jamais mise en cache, comme les autres mini-jeux.
+ *
+ * Entièrement en ALLEMAND (phrase, mots-clés ET distracteurs) — pas de
+ * mélange de langues comme avant. `chapter.concepts`/`summary` sont déjà en
+ * allemand (vocabulaire d'examen réel), donc demander une phrase "en
+ * français" tout en retirant des mots-clés piochés dans ce contenu allemand
+ * produisait mécaniquement un mélange (squelette français, mots-clés
+ * allemands sans traduction naturelle en contexte) — signalé par Ricky
+ * comme peu clair ("nachvollziehen" compliqué). Même logique que
+ * front_de/back_de des flashcards : une seule langue de bout en bout par
+ * exercice plutôt qu'une traduction forcée qui perdrait le vrai terme
+ * d'examen.
  */
 export function buildFillBlankPrompt(
   chapter: Pick<StudyChapter, "title_de" | "concepts" | "summary">
 ): string {
   const conceptList = chapter.concepts.join(", ")
 
-  return `Génère un texte à trous pour réviser le chapitre "${chapter.title_de}".
+  return `Generiere einen Lückentext zur Wiederholung des Kapitels "${chapter.title_de}".
 
-Résumé : ${chapter.summary}
-Concepts : ${conceptList}
+Zusammenfassung: ${chapter.summary}
+Konzepte: ${conceptList}
 
-Écris 1 à 2 phrases courtes en français qui expliquent un point clé du chapitre, avec ${MIN_BLANKS} à ${MAX_BLANKS} mots-clés retirés et remplacés par des marqueurs [1], [2], [3] dans l'ordre. Chaque mot-clé retiré doit être un terme précis et important (pas un mot banal comme "le" ou "est"), idéalement un des concepts listés ci-dessus ou un terme technique du résumé.
+Schreibe 1 bis 2 kurze Sätze auf DEUTSCH, die einen zentralen Punkt des Kapitels erklären, mit ${MIN_BLANKS} bis ${MAX_BLANKS} entfernten Schlüsselbegriffen, ersetzt durch die Marker [1], [2], [3] in dieser Reihenfolge. Jeder entfernte Begriff muss ein präzises und wichtiges Fachwort sein (kein banales Wort wie "der" oder "ist") — idealerweise eines der oben gelisteten Konzepte oder ein Fachbegriff aus der Zusammenfassung. Alles auf Deutsch: der Satz, die entfernten Begriffe UND die Distraktoren — niemals eine Mischung aus Deutsch und einer anderen Sprache.
 
-La phrase doit se déduire directement du résumé fourni — n'ajoute aucun fait précis (chiffre, date, nom propre, norme) qui n'y figure pas déjà, même s'il te semble vrai de ta connaissance générale : un étudiant qui réviserait sur une affirmation non enseignée par son cours serait induit en erreur.
+Der Satz muss sich direkt aus der gegebenen Zusammenfassung ableiten lassen — füge keine präzise Tatsache hinzu (Zahl, Datum, Eigenname, Norm), die dort nicht bereits steht, selbst wenn sie dir aus allgemeinem Wissen wahr erscheint: ein Studierender, der mit einer nicht im Kurs vermittelten Aussage lernt, würde in die Irre geführt.
 
-Fournis aussi 2 à 3 mots "distracteurs" : des termes plausibles dans le même registre que les bonnes réponses, mais clairement faux à cet endroit précis — pas des mots aléatoires sans rapport.
+Liefere außerdem 2 bis 3 "Distraktoren": Begriffe, die im gleichen Register wie die richtigen Antworten plausibel klingen, an dieser Stelle aber eindeutig falsch sind — keine zufälligen, thematisch unpassenden Wörter.
 
-Réponds UNIQUEMENT avec du JSON valide, sans markdown, sans backticks :
+Antworte AUSSCHLIESSLICH mit gültigem JSON, ohne Markdown, ohne Backticks:
 {
-  "text_template": "Phrase avec [1] et [2] à la place des mots retirés.",
-  "blanks": ["mot retiré pour [1]", "mot retiré pour [2]"],
-  "distractors": ["terme plausible mais faux", "autre terme plausible mais faux"]
+  "text_template": "Satz mit [1] und [2] anstelle der entfernten Wörter.",
+  "blanks": ["entfernter Begriff für [1]", "entfernter Begriff für [2]"],
+  "distractors": ["plausibler, aber falscher Begriff", "weiterer plausibler, aber falscher Begriff"]
 }`
 }
