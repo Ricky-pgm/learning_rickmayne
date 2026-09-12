@@ -1,6 +1,7 @@
 import { buildWebEnrichmentPrompt, type WebEnrichmentResult } from '@/lib/study/web-enrichment-prompt'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { extractTextBlock } from '@/lib/anthropic-response'
+import { extractJSON } from '@/lib/study/ai-client'
 import { getChapterForPrompt } from '@/lib/study/get-chapter-for-prompt'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
@@ -48,6 +49,13 @@ export async function POST(req: Request) {
     body: JSON.stringify({
       model,
       max_tokens: 2000,
+      // effort "low" : Sonnet 5 enclenchait par défaut une longue chaîne de
+      // raisonnement + exécution de code pour vérifier ses sources avant de
+      // répondre — mesuré réellement à 106k tokens d'entrée / ~5k de sortie
+      // pour UN chapitre en effort par défaut, contre 53k / ~1.3k en "low"
+      // (qualité des sources comparable dans les deux cas testés). C'est ce
+      // raisonnement, pas le nombre de recherches, qui dominait le coût.
+      output_config: { effort: 'low' },
       tools: [
         {
           type: 'web_search_20260209',
@@ -55,7 +63,12 @@ export async function POST(req: Request) {
           // Un chapitre = 2-3 sources visées (voir le prompt) — borne dure
           // sur le nombre de recherches pour ne jamais dépasser un coût
           // prévisible par génération, même si le modèle en ferait plus.
-          max_uses: 4,
+          // Réduit de 4 à 2 (signalé par Ricky comme la fonctionnalité la
+          // plus coûteuse de l'app, web_search étant facturé $0.01/recherche
+          // EN PLUS des tokens) — 2 sources visées, 2 recherches max reste
+          // cohérent avec le nombre de sources réellement demandées au
+          // modèle plutôt que de lui laisser de la marge inutilisée.
+          max_uses: 2,
         },
       ],
       messages: [{ role: 'user', content: prompt }],
@@ -89,9 +102,7 @@ export async function POST(req: Request) {
   }
 
   const text = extractTextBlock(data.content)
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start === -1 || end === -1) {
+  if (!text.includes('{') || !text.includes('}')) {
     console.error('[study/web-enrichment] pas de JSON exploitable', {
       stopReason: data.stop_reason,
       contentTypes: (data.content ?? []).map((b: { type?: string }) => b.type),
@@ -103,9 +114,16 @@ export async function POST(req: Request) {
     )
   }
 
+  // extractJSON (au lieu d'un JSON.parse brut, comme avant) : la réponse
+  // d'un modèle qui vient d'utiliser web_search inclut parfois un extrait
+  // de page web dans un résumé, avec des caractères de contrôle bruts ou
+  // une virgule traînante — exactement le motif que ce endpoint laissait
+  // auparavant remonter comme "JSON invalide" sans repli, après avoir déjà
+  // payé le coût des recherches (voir docs/db-anpassung.md). Même fonction
+  // de repli que les autres générations IA du mode étude.
   let result: WebEnrichmentResult
   try {
-    result = JSON.parse(text.slice(start, end + 1))
+    result = extractJSON(text) as WebEnrichmentResult
   } catch (e) {
     console.error('[study/web-enrichment] JSON invalide', e, text.slice(0, 500))
     return Response.json(
@@ -121,19 +139,28 @@ export async function POST(req: Request) {
     )
   }
 
+  // web_search peut faire apparaître des balises de citation inline dans le
+  // texte généré (ex. <cite index="2-0">...</cite>) — observé en test réel
+  // avec effort:"low" (voir plus bas), jamais documenté par l'API mais
+  // reproductible. Sans ce nettoyage, une balise brute s'afficherait telle
+  // quelle dans summary_fr plutôt que d'être invisible pour l'utilisateur.
+  const stripCiteTags = (s: string) => s.replace(/<\/?cite[^>]*>/g, '').trim()
+
   // Le prompt demande de ne jamais inventer d'URL, mais rien ne le
   // garantit — une URL mal formée ou hallucinée s'afficherait sinon comme
   // lien cliquable "source fiable" sans qu'on ait pu la détecter avant.
   // On ne filtre que la forme (http(s) valide), pas l'existence réelle de
   // la page — vérifier ça demanderait une requête réseau supplémentaire.
-  const validSources = result.sources.filter(s => {
-    try {
-      const parsed = new URL(s.url)
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
-    } catch {
-      return false
-    }
-  })
+  const validSources = result.sources
+    .map(s => ({ ...s, summary_fr: stripCiteTags(s.summary_fr) }))
+    .filter(s => {
+      try {
+        const parsed = new URL(s.url)
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      } catch {
+        return false
+      }
+    })
 
   if (validSources.length === 0) {
     console.error('[study/web-enrichment] toutes les sources avaient une URL invalide', { chapterId, raw: result.sources })

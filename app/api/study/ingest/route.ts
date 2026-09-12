@@ -5,6 +5,7 @@ import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { extractPdfPageRange, countPdfPages } from '@/lib/study/pdf-split'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
 import { extractTextBlock } from '@/lib/anthropic-response'
+import { extractJSON } from '@/lib/study/ai-client'
 
 // Limite dure de l'API Anthropic pour les PDF en pièce jointe (contexte 1M) —
 // voir docs/etude-mode-plan.md §5.3 étape 1. Un fichier plus gros doit être
@@ -193,9 +194,15 @@ export async function POST(req: Request) {
     )
   }
 
+  // extractJSON (au lieu d'un JSON.parse brut, comme avant) : un PDF de
+  // cours contient souvent des sauts de ligne bruts dans un extrait de code
+  // ou une citation que le modèle recopie sans les échapper — exactement le
+  // motif que ce endpoint laissait remonter comme "JSON invalide" sans
+  // repli, après avoir déjà payé le coût du plus gros appel Sonnet de
+  // l'app. Même fonction de repli que les autres générations IA.
   let ingestResult: IngestResult
   try {
-    ingestResult = JSON.parse(text.slice(start, end + 1))
+    ingestResult = extractJSON(text.slice(start, end + 1)) as IngestResult
   } catch (e) {
     console.error('[study/ingest] JSON invalide', e, text.slice(0, 500))
     return Response.json(

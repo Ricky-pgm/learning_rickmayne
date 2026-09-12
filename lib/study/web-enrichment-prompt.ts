@@ -24,7 +24,7 @@ export function buildWebEnrichmentPrompt(
 ): string {
   const conceptList = chapter.concepts.join(", ")
 
-  return `Cherche 2 à 3 sources fiables sur le web en lien avec le chapitre "${chapter.title_de}", pour aller plus loin après avoir déjà étudié le résumé ci-dessous.
+  return `Cherche 2 sources fiables sur le web en lien avec le chapitre "${chapter.title_de}", pour aller plus loin après avoir déjà étudié le résumé ci-dessous.
 
 Résumé déjà connu : ${chapter.summary}
 Concepts déjà couverts : ${conceptList}
