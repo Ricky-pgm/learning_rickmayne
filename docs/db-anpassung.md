@@ -506,6 +506,17 @@ create policy "Users manage their own study course files"
 
 Bucket privé (`public = false`) — vérifier après coup : onglet **Storage**, cadenas visible.
 
+### 5bis. Limite de type/taille côté bucket — FAIT
+
+`validateCourseFile` (`lib/study/storage.ts`) rejette déjà un fichier non-PDF ou trop lourd, mais **côté navigateur uniquement** — un appel direct à l'API Storage avec la clé anon (publique) le contourne entièrement. La policy RLS ci-dessus ne contrôle que le préfixe du chemin, jamais le type ni la taille. Seule une limite posée sur le bucket lui-même n'est pas contournable par le client :
+
+```sql
+update storage.buckets
+set allowed_mime_types = array['application/pdf'],
+    file_size_limit = 41943040  -- 40 Mo, même limite que validateCourseFile
+where id = 'study-course-files';
+```
+
 ## 6. Vérification finale
 
 ```sql

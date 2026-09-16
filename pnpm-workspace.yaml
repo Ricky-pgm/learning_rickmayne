@@ -1,3 +1,24 @@
 allowBuilds:
   sharp: true
   unrs-resolver: true
+
+# @modelcontextprotocol/sdk vient en dépendance transitive de shadcn (outil
+# CLI de dev, jamais exécuté en production). Même en overridant le SDK à sa
+# dernière version (1.30.0), il fige lui-même hono@4.12.27 en dépendance
+# directe — vulnérable (GHSA-79qm-7rj5-m7r9 et consorts, patché en
+# >=4.12.34). Override direct sur hono nécessaire en plus.
+minimumReleaseAgeExclude:
+  - baseline-browser-mapping@2.11.24
+  - browserslist@4.29.0
+
+overrides:
+  "@modelcontextprotocol/sdk": "1.30.0"
+  "hono": "^4.13.8"
+  # Chaînes transitives figées à des versions vulnérables par shadcn/eslint/
+  # next>styled-jsx>@babel — vérifié réellement (pnpm audit) que ces
+  # versions patchées suppriment les advisories correspondantes.
+  "brace-expansion@1": "^1.1.21"
+  "brace-expansion@5": "^5.0.12"
+  "js-yaml": "^4.3.2"
+  "browserslist": "^4.29.0"
+  "baseline-browser-mapping": "^2.11.24"

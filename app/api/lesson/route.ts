@@ -2,6 +2,8 @@ import { getChapter } from '@/lib/courses'
 import { getLangLabel } from '@/lib/lang'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { extractTextBlock } from '@/lib/anthropic-response'
+import { getSupabaseServerClient } from '@/lib/supabase-server'
+import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -9,6 +11,15 @@ export async function POST(req: Request) {
       { error: getApiErrorMessage('ANTHROPIC_API_KEY') },
       { status: 500 }
     )
+  }
+
+  // Cette route (mode Klausur, legacy) n'avait aucune limite — même garde
+  // que /api/study/* (audit sécurité).
+  try {
+    await checkAndConsumeAiQuota(await getSupabaseServerClient(), 'heavy')
+  } catch (e) {
+    if (e instanceof RateLimitError) return Response.json({ error: e.message }, { status: 429 })
+    throw e
   }
 
   const { courseId, chapterId } = await req.json()
