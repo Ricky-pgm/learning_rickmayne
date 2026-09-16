@@ -1,6 +1,7 @@
 import { getChapter } from '@/lib/courses'
 import { getLangLabel } from '@/lib/lang'
 import { getApiErrorMessage } from '@/lib/api-errors'
+import { parseJsonBody } from '@/lib/api-request'
 import { extractTextBlock } from '@/lib/anthropic-response'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
@@ -22,8 +23,9 @@ export async function POST(req: Request) {
     throw e
   }
 
-  const { courseId, chapterId } = await req.json()
-  const chapter = getChapter(courseId, chapterId)
+  const body = await parseJsonBody<{ courseId?: string; chapterId?: number }>(req)
+  const { courseId, chapterId } = body ?? {}
+  const chapter = courseId && chapterId !== undefined ? getChapter(courseId, chapterId) : null
   if (!chapter) return Response.json({ error: 'Chapitre non trouvé' }, { status: 404 })
 
   const langLabel = getLangLabel(chapter.lang)

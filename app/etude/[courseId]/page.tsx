@@ -8,16 +8,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertAction } from "@/components/ui/alert"
 import { Spinner } from "@/components/ui/spinner"
-import { ArrowLeft, ArrowRight, FileText, Sparkles, AlertCircle, CheckCircle2, BookOpen, Clock, Info } from "lucide-react"
+import { ArrowLeft, ArrowRight, FileText, Sparkles, AlertCircle, AlertTriangle, CheckCircle2, BookOpen, Clock, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { getStudyCourse, listFiles, updateStudyCourseFileStatus, saveIngestResult } from "@/lib/study/queries"
 import { listStudyChaptersWithProgress, type StudyChapterWithProgress } from "@/lib/study/lesson-queries"
 import { PROFILE_UI } from "@/lib/study/profile-ui"
 import { estimateChapterTime } from "@/lib/study/time-estimate"
-import type { IngestResult } from "@/lib/study/ingest-prompt"
+import type { IngestApiResponse } from "@/app/api/study/ingest/route"
 import type { IngestPlan } from "@/app/api/study/ingest/plan/route"
 import type { StudyCourse, StudyCourseFile } from "@/lib/study/types"
+import type { ChapterValidationIssue } from "@/lib/study/validate-chapters"
 
 // Une ingestion normale (même multi-tranches sur un gros PDF) se termine en
 // quelques minutes. Au-delà, un fichier resté en "processing" est presque
@@ -44,6 +45,13 @@ export default function EtudeCoursePage() {
   const [processingFileId, setProcessingFileId] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
   const [error, setError] = useState("")
+  // Anomalies structurelles détectées par validateChapters (titre
+  // manquant, concept orphelin, rupture de numérotation...) — calculées
+  // par la route depuis le début mais jamais lues côté client jusqu'ici
+  // (data as IngestResult ignorait silencieusement ce champ, audit
+  // sécurité F-3/D-3). Non bloquant par nature : les chapitres sont déjà
+  // enregistrés, ceci n'est qu'un signal à vérifier manuellement.
+  const [warnings, setWarnings] = useState<ChapterValidationIssue[]>([])
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +76,7 @@ export default function EtudeCoursePage() {
 
   async function handleGenerate(file: StudyCourseFile) {
     setError("")
+    setWarnings([])
     setProcessingFileId(file.id)
     try {
       await updateStudyCourseFileStatus(file.id, "processing")
@@ -116,12 +125,19 @@ export default function EtudeCoursePage() {
           throw new Error(data.error ?? "Erreur lors de la génération des chapitres")
         }
 
-        const ingestResult = data as IngestResult
+        const ingestResult = data as IngestApiResponse
         // saveIngestResult fait maintenant tout dans une seule transaction
         // côté DB (calcul d'offset, insertion des chapitres, avancement de
         // la tranche) — voir son commentaire dans lib/study/queries.ts pour
         // le bug de race condition + duplication que ça corrige.
         await saveIngestResult(courseId, file.id, ingestResult, i)
+
+        // Accumulées entre tranches plutôt que remplacées — un gros PDF
+        // en plusieurs tranches ne doit pas perdre les anomalies des
+        // tranches précédentes à chaque nouvelle tranche traitée.
+        if (ingestResult.validationIssues.length > 0) {
+          setWarnings(prev => [...prev, ...ingestResult.validationIssues])
+        }
 
         // Chaque tranche traitée est déjà sauvegardée en base — si une
         // tranche suivante échoue, les chapitres déjà générés restent
@@ -213,6 +229,27 @@ export default function EtudeCoursePage() {
           <AlertCircle />
           <AlertDescription>{error}</AlertDescription>
           <AlertAction onClick={() => setError("")}>OK</AlertAction>
+        </Alert>
+      )}
+
+      {/* Non bloquant par nature (voir validateChapters) — les chapitres
+          sont déjà enregistrés à ce stade, ceci ne fait que signaler des
+          anomalies structurelles (titre manquant, rupture de
+          numérotation...) à vérifier manuellement si besoin. */}
+      {warnings.length > 0 && (
+        <Alert className="items-start gap-3 border-warning/30 bg-warning/5">
+          <AlertTriangle className="text-warning" />
+          <AlertDescription className="space-y-1">
+            <p className="font-medium text-foreground">
+              {warnings.length} anomalie{warnings.length > 1 ? "s" : ""} détectée{warnings.length > 1 ? "s" : ""} dans le découpage généré
+            </p>
+            <ul className="list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
+              {warnings.map((w, i) => (
+                <li key={i}>{w.message}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+          <AlertAction onClick={() => setWarnings([])}>OK</AlertAction>
         </Alert>
       )}
 

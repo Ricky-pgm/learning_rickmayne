@@ -1,5 +1,6 @@
 import { buildWebEnrichmentPrompt, type WebEnrichmentResult } from '@/lib/study/web-enrichment-prompt'
 import { getApiErrorMessage } from '@/lib/api-errors'
+import { parseJsonBody } from '@/lib/api-request'
 import { extractTextBlock } from '@/lib/anthropic-response'
 import { extractJSON } from '@/lib/study/ai-client'
 import { getChapterForPrompt } from '@/lib/study/get-chapter-for-prompt'
@@ -14,7 +15,8 @@ export async function POST(req: Request) {
     )
   }
 
-  const { chapterId } = await req.json()
+  const body = await parseJsonBody<{ chapterId?: string }>(req)
+  const chapterId = body?.chapterId
   if (!chapterId || typeof chapterId !== 'string') {
     return Response.json({ error: 'chapterId manquant' }, { status: 400 })
   }

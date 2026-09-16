@@ -1,6 +1,7 @@
 import { getChapter } from '@/lib/courses'
 import { buildPrompt } from '@/lib/prompts'
 import { getApiErrorMessage } from '@/lib/api-errors'
+import { parseJsonBody } from '@/lib/api-request'
 import { extractTextBlock } from '@/lib/anthropic-response'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
@@ -22,8 +23,17 @@ export async function POST(req: Request) {
     throw e
   }
 
-  const { courseId, chapterId, exerciseType, fillBlankMode } = await req.json()
-  const chapter = getChapter(courseId, chapterId)
+  const body = await parseJsonBody<{
+    courseId?: string
+    chapterId?: number
+    exerciseType?: string
+    fillBlankMode?: string
+  }>(req)
+  const { courseId, chapterId, exerciseType, fillBlankMode } = body ?? {}
+  if (!exerciseType) {
+    return Response.json({ error: 'exerciseType manquant' }, { status: 400 })
+  }
+  const chapter = courseId && chapterId !== undefined ? getChapter(courseId, chapterId) : null
   if (!chapter) return Response.json({ error: 'Chapitre non trouvé' }, { status: 404 })
 
   if (chapter.hasCode === false && exerciseType === 'codeAnalysis') {

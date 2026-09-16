@@ -1,4 +1,5 @@
 import { getApiErrorMessage } from '@/lib/api-errors'
+import { parseJsonBody } from '@/lib/api-request'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { callClaude, extractJSON } from '@/lib/study/ai-client'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
@@ -29,7 +30,8 @@ export interface IngestPlan {
  * via /api/study/ingest (PDF natif, comme avant).
  */
 export async function POST(req: Request) {
-  const { fileId } = await req.json()
+  const body = await parseJsonBody<{ fileId?: string }>(req)
+  const fileId = body?.fileId
   if (!fileId || typeof fileId !== 'string') {
     return Response.json({ error: 'fileId manquant' }, { status: 400 })
   }

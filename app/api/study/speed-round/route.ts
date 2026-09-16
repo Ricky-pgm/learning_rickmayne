@@ -1,5 +1,6 @@
 import { buildSpeedRoundPrompt } from '@/lib/study/speed-round-prompt'
 import { getApiErrorMessage } from '@/lib/api-errors'
+import { parseJsonBody } from '@/lib/api-request'
 import { callClaude, extractJSON, ClaudeApiError } from '@/lib/study/ai-client'
 import { getChapterForPrompt } from '@/lib/study/get-chapter-for-prompt'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
@@ -13,7 +14,8 @@ export async function POST(req: Request) {
     )
   }
 
-  const { chapterId } = await req.json()
+  const body = await parseJsonBody<{ chapterId?: string }>(req)
+  const chapterId = body?.chapterId
   if (!chapterId || typeof chapterId !== 'string') {
     return Response.json({ error: 'chapterId manquant' }, { status: 400 })
   }

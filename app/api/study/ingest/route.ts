@@ -1,11 +1,23 @@
 import { buildIngestPrompt, type IngestResult } from '@/lib/study/ingest-prompt'
-import { validateChapters } from '@/lib/study/validate-chapters'
+import { validateChapters, type ChapterValidationIssue } from '@/lib/study/validate-chapters'
 import { getApiErrorMessage } from '@/lib/api-errors'
+import { parseJsonBody } from '@/lib/api-request'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { extractPdfPageRange, countPdfPages } from '@/lib/study/pdf-split'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
 import { extractTextBlock } from '@/lib/anthropic-response'
 import { extractJSON } from '@/lib/study/ai-client'
+
+/**
+ * Réponse réelle de cette route — IngestResult (le résultat IA brut) PLUS
+ * validationIssues, calculées ici mais auparavant jamais lues côté client
+ * (audit sécurité, F-3/D-3) : app/etude/[courseId]/page.tsx faisait
+ * `data as IngestResult`, un simple cast qui ignore silencieusement tout
+ * champ supplémentaire de la réponse JSON réelle — validateChapters
+ * tournait pour rien à chaque ingestion. Type exporté pour que l'appelant
+ * arrête de deviner la forme de la réponse.
+ */
+export type IngestApiResponse = IngestResult & { validationIssues: ChapterValidationIssue[] }
 
 // Limite dure de l'API Anthropic pour les PDF en pièce jointe (contexte 1M) —
 // voir docs/etude-mode-plan.md §5.3 étape 1. Un fichier plus gros doit être
@@ -23,7 +35,9 @@ export async function POST(req: Request) {
     )
   }
 
-  const { fileId, startPage, endPage } = await req.json()
+  const body = await parseJsonBody<{ fileId?: string; startPage?: number; endPage?: number }>(req)
+  const fileId = body?.fileId
+  const { startPage, endPage } = body ?? {}
   if (!fileId || typeof fileId !== 'string') {
     return Response.json({ error: 'fileId manquant' }, { status: 400 })
   }

@@ -2,6 +2,7 @@ import { getCourse } from '@/lib/courses'
 import { buildKlausurPrompt } from '@/lib/prompts'
 import { isKlausurRelevant } from '@/lib/chapters/types'
 import { getApiErrorMessage } from '@/lib/api-errors'
+import { parseJsonBody } from '@/lib/api-request'
 import { extractTextBlock } from '@/lib/anthropic-response'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
@@ -25,8 +26,9 @@ export async function POST(req: Request) {
     throw e
   }
 
-  const { courseId, variantNumber } = await req.json()
-  const course = getCourse(courseId)
+  const body = await parseJsonBody<{ courseId?: string; variantNumber?: number }>(req)
+  const { courseId, variantNumber } = body ?? {}
+  const course = courseId ? getCourse(courseId) : null
   if (!course) return Response.json({ error: 'Cours non trouvé' }, { status: 404 })
 
   const klausurChapters = course.chapters.filter(isKlausurRelevant)
