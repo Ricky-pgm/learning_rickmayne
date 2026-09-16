@@ -641,6 +641,39 @@ join auth.users u on u.id = a.user_id
 order by a.approved_at;
 ```
 
+### 6quinquies. Email d'alerte à l'admin sur nouvelle inscription
+
+Sans ça, un compte non approuvé (§6quater) reste bloqué indéfiniment si la personne ne prévient pas Ricky directement — aucune notification n'existait. Fonction : `supabase/functions/notify-new-signup/index.ts`, déclenchée par un Database Webhook sur `insert` dans `auth.users`, envoie un email via Resend.
+
+**1. Déployer la fonction** (depuis la racine du projet — `npx supabase` s'installe à la volée si la CLI n'est pas globalement installée) :
+
+```bash
+npx supabase login
+npx supabase link --project-ref <ton-project-ref>   # visible dans l'URL du dashboard Supabase
+npx supabase functions deploy notify-new-signup --no-verify-jwt
+```
+
+`--no-verify-jwt` est nécessaire : le webhook Supabase appelle la fonction sans jeton utilisateur (c'est un appel serveur-à-serveur interne), une vérification JWT par défaut la rejetterait avec 401.
+
+**2. Configurer les secrets** (jamais dans `.env.local` — lu par Next.js/Vercel, pas par les Edge Functions, qui ont leur propre magasin de secrets) :
+
+```bash
+npx supabase secrets set RESEND_API_KEY=<ta clé Resend> --project-ref <ton-project-ref>
+npx supabase secrets set ADMIN_NOTIFICATION_EMAIL=<ton email> --project-ref <ton-project-ref>
+```
+
+En mode test Resend (pas de domaine vérifié, expéditeur `onboarding@resend.dev`), `ADMIN_NOTIFICATION_EMAIL` doit être l'adresse utilisée pour créer le compte Resend — Resend refuse d'envoyer ailleurs tant qu'aucun domaine n'est vérifié.
+
+**3. Créer le Database Webhook** — Dashboard Supabase → **Database** → **Webhooks** → **Create a new hook** :
+- Name : `notify-new-signup`
+- Table : `auth.users`
+- Events : `Insert` uniquement
+- Type : `Supabase Edge Functions`
+- Edge Function : `notify-new-signup`
+- HTTP Headers : aucun header d'auth supplémentaire nécessaire (la fonction est déployée avec `--no-verify-jwt`)
+
+**Vérification** : crée un compte de test depuis `/login` → un email doit arriver à `ADMIN_NOTIFICATION_EMAIL` dans la minute, avec l'email du nouveau compte et la requête SQL prête à copier pour l'approuver.
+
 ## 7. Reste à faire (plus tard, pas maintenant)
 
 Reporter le SQL des §3/§4 dans `supabase/migrations/0003_study_mode.sql` (+ un `0005_study_progress_view.sql` séparé pour la vue), pour que `supabase db push` redevienne la source de vérité.
