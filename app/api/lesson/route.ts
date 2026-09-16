@@ -3,6 +3,7 @@ import { getLangLabel } from '@/lib/lang'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { parseJsonBody } from '@/lib/api-request'
 import { extractTextBlock } from '@/lib/anthropic-response'
+import { extractJSON } from '@/lib/study/ai-client'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
 
@@ -85,14 +86,16 @@ Antworte AUSSCHLIESSLICH mit gültigem JSON. Kein Markdown, keine Backticks.
   }
 
   const text = extractTextBlock(data.content)
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start === -1 || end === -1) return Response.json({ error: 'Réponse invalide' }, { status: 500 })
+  if (!text.includes('{') || !text.includes('}')) {
+    return Response.json({ error: 'Réponse invalide' }, { status: 500 })
+  }
 
+  // extractJSON (au lieu d'un JSON.parse brut, comme avant) : même repli
+  // que /api/study/* — voir lib/study/ai-client.ts.
   try {
-    const lesson = JSON.parse(text.slice(start, end + 1))
+    const lesson = extractJSON(text)
     return Response.json(lesson)
-  } catch {
-    return Response.json({ error: 'JSON invalide' }, { status: 500 })
+  } catch (e) {
+    return Response.json({ error: `JSON invalide reçu de l'IA : ${e instanceof Error ? e.message : String(e)}` }, { status: 500 })
   }
 }

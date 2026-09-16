@@ -3,6 +3,7 @@ import { buildPrompt } from '@/lib/prompts'
 import { getApiErrorMessage } from '@/lib/api-errors'
 import { parseJsonBody } from '@/lib/api-request'
 import { extractTextBlock } from '@/lib/anthropic-response'
+import { extractJSON } from '@/lib/study/ai-client'
 import { getSupabaseServerClient } from '@/lib/supabase-server'
 import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
 
@@ -75,14 +76,16 @@ export async function POST(req: Request) {
   }
 
   const text = extractTextBlock(data.content)
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start === -1 || end === -1) return Response.json({ error: 'Réponse invalide' }, { status: 500 })
+  if (!text.includes('{') || !text.includes('}')) {
+    return Response.json({ error: 'Réponse invalide' }, { status: 500 })
+  }
 
+  // extractJSON (au lieu d'un JSON.parse brut, comme avant) : même repli
+  // que /api/study/* — voir lib/study/ai-client.ts.
   try {
-    const exercise = JSON.parse(text.slice(start, end + 1))
+    const exercise = extractJSON(text)
     return Response.json(exercise)
-  } catch {
-    return Response.json({ error: 'JSON invalide' }, { status: 500 })
+  } catch (e) {
+    return Response.json({ error: `JSON invalide reçu de l'IA : ${e instanceof Error ? e.message : String(e)}` }, { status: 500 })
   }
 }
