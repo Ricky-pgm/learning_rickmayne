@@ -10,6 +10,13 @@ export interface ReviewState {
 const MIN_EASE = 1.3
 const DEFAULT_EASE = 2.5
 
+// Sans plafond, des "easy" répétés multiplient l'interval par ease*1.3 à
+// chaque révision (croissance exponentielle) — après ~20 répétitions
+// l'interval dépasse 10^11 jours et Date.setUTCDate produit une date
+// invalide (RangeError plus loin dans addDays). Deux ans dépasse déjà
+// largement l'horizon utile d'une révision espacée.
+const MAX_INTERVAL_DAYS = 730
+
 function addDays(from: Date, days: number): Date {
   const result = new Date(from)
   result.setUTCDate(result.getUTCDate() + days)
@@ -45,7 +52,7 @@ export function scheduleNext(
       }
 
     case "hard": {
-      const nextInterval = Math.max(1, Math.ceil(intervalDays * 1.2))
+      const nextInterval = Math.min(MAX_INTERVAL_DAYS, Math.max(1, Math.ceil(intervalDays * 1.2)))
       return {
         intervalDays: nextInterval,
         easeFactor: Math.max(MIN_EASE, easeFactor - 0.15),
@@ -56,7 +63,7 @@ export function scheduleNext(
 
     case "good": {
       const newEase = reviews === 0 ? easeFactor : Math.min(easeFactor + 0.05, 3.0)
-      const nextInterval = Math.max(1, Math.ceil(intervalDays * easeFactor))
+      const nextInterval = Math.min(MAX_INTERVAL_DAYS, Math.max(1, Math.ceil(intervalDays * easeFactor)))
       return {
         intervalDays: nextInterval,
         easeFactor: newEase,
@@ -66,7 +73,7 @@ export function scheduleNext(
     }
 
     case "easy": {
-      const nextInterval = Math.max(1, Math.ceil(intervalDays * easeFactor * 1.3))
+      const nextInterval = Math.min(MAX_INTERVAL_DAYS, Math.max(1, Math.ceil(intervalDays * easeFactor * 1.3)))
       return {
         intervalDays: nextInterval,
         easeFactor: Math.min(easeFactor + 0.15, 3.0),
