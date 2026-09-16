@@ -674,9 +674,16 @@ En mode test Resend (pas de domaine vérifié, expéditeur `onboarding@resend.de
 
 **Vérification** : crée un compte de test depuis `/login` → un email doit arriver à `ADMIN_NOTIFICATION_EMAIL` dans la minute, avec l'email du nouveau compte et la requête SQL prête à copier pour l'approuver.
 
-## 7. Reste à faire (plus tard, pas maintenant)
+## 7. Migrations reportées dans supabase/migrations/ — FAIT
 
-Reporter le SQL des §3/§4 dans `supabase/migrations/0003_study_mode.sql` (+ un `0005_study_progress_view.sql` séparé pour la vue), pour que `supabase db push` redevienne la source de vérité.
+Le SQL exécuté directement en production via le SQL Editor (§3/§3bis/§3ter/§4/§4bis/§5bis/§6bis/§6quater) a été reporté dans deux nouveaux fichiers :
+- `0005_study_mode_complete.sql` — colonnes/tables/trigger manquants de `0003_study_mode.sql` (`title`, `code_snippets`, `code_lang`, `profile`, `is_organizational`, `study_web_enrichment`, `study_exercise_history`, `study_ai_usage`/`increment_ai_usage`, `study_approved_users`).
+- `0006_study_progress_view.sql` — la vue `study_chapters_with_progress` (§4) + le fix `security_invoker` (§4bis), dans son propre fichier car elle dépend de tables créées dans `0005`.
+- `0004_study_storage.sql` mis à jour avec le `update` de §5bis (limite type/taille du bucket).
+
+Vérifié : les 6 migrations (`0001` à `0006`) exécutées dans l'ordre sur une instance Postgres locale neuve (fixture minimal simulant `auth.users`/`storage.*`) passent sans erreur, et le schéma résultant contient exactement les colonnes/tables lues par le code de l'application (vérifié par `information_schema.columns` sur `study_chapters`/`study_course_files`, requête de la vue, et lecture du bucket).
+
+`supabase db push` sur un projet neuf redevient donc reproductible — ce n'était plus le cas depuis l'ajout de `profile`/`is_organizational`/`study_web_enrichment`/etc. exécutés uniquement à la main.
 
 ## 8. Empêcher la pause Supabase (plan Free)
 
