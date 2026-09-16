@@ -571,6 +571,76 @@ Deux problèmes trouvés en usage réel (chapitre pratiqué via Carte de concept
 
 Vérification : jouer un exercice sur un chapitre jusqu'à 3 bonnes réponses (n'importe quel type), revenir sur la page cours — `mastery_pct` doit refléter ce travail sans avoir touché aux flashcards.
 
+## 6quater. Approbation manuelle des nouveaux comptes — FAIT
+
+Contexte : l'inscription publique reste ouverte (`auth.signUp` non restreint), mais Ricky veut garder la main sur qui peut réellement créer un cours/uploader un PDF (le seul point d'entrée qui déclenche des appels IA payants) — sans bloquer entièrement l'inscription, qui empêcherait aussi d'inviter quelqu'un facilement. Un nouveau compte doit pouvoir se connecter et voir l'interface, mais pas créer de cours ni uploader tant qu'il n'a pas été approuvé manuellement.
+
+```sql
+create table if not exists public.study_approved_users (
+  user_id      uuid primary key references auth.users(id) on delete cascade,
+  approved_at  timestamptz not null default now()
+);
+
+alter table public.study_approved_users enable row level security;
+
+-- Chacun peut lire SA propre ligne (pour que le front sache s'il est
+-- approuvé et affiche le bon message) — jamais celle des autres, et
+-- personne n'écrit dedans depuis le client (aucune policy insert/update/
+-- delete : seul un admin via le SQL Editor, avec la clé service_role qui
+-- contourne RLS, peut approuver).
+drop policy if exists "study_approved_users_read_own" on public.study_approved_users;
+create policy "study_approved_users_read_own"
+  on public.study_approved_users for select
+  using (auth.uid() = user_id);
+
+-- Policy INSERT séparée, en plus (pas à la place) de
+-- "study_courses_user_own" — celle-ci ne restreint que la CRÉATION, la
+-- policy "for all" existante continue de gérer select/update/delete sur
+-- ses propres lignes sans changement.
+drop policy if exists "study_courses_insert_requires_approval" on public.study_courses;
+create policy "study_courses_insert_requires_approval"
+  on public.study_courses for insert
+  with check (
+    auth.uid() = user_id
+    and exists (select 1 from public.study_approved_users a where a.user_id = auth.uid())
+  );
+
+drop policy if exists "study_course_files_insert_requires_approval" on public.study_course_files;
+create policy "study_course_files_insert_requires_approval"
+  on public.study_course_files for insert
+  with check (
+    auth.uid() = user_id
+    and exists (select 1 from public.study_approved_users a where a.user_id = auth.uid())
+  );
+```
+
+**Approuver un compte** (à lancer manuellement dans le SQL Editor après inscription) :
+
+```sql
+insert into public.study_approved_users (user_id)
+select id from auth.users where email = 'email-de-la-personne@example.com'
+on conflict (user_id) do nothing;
+```
+
+**Important — comptes existants** : cette policy INSERT s'ajoute à `study_courses_insert_requires_approval` en plus de l'ancienne policy `for all`, donc **tout compte déjà utilisé aujourd'hui (Ricky, son deuxième compte) doit être approuvé une fois manuellement**, sinon il ne pourra plus créer de nouveau cours après cette migration :
+
+```sql
+insert into public.study_approved_users (user_id)
+select id from auth.users
+on conflict (user_id) do nothing;
+```
+
+(Cette dernière requête approuve TOUS les comptes existants au moment où elle est jouée — à n'exécuter qu'une fois, juste après la création de la table, jamais après.)
+
+**Vérification** : lister qui est approuvé —
+
+```sql
+select u.email, a.approved_at
+from public.study_approved_users a
+join auth.users u on u.id = a.user_id
+order by a.approved_at;
+```
+
 ## 7. Reste à faire (plus tard, pas maintenant)
 
 Reporter le SQL des §3/§4 dans `supabase/migrations/0003_study_mode.sql` (+ un `0005_study_progress_view.sql` séparé pour la vue), pour que `supabase db push` redevienne la source de vérité.

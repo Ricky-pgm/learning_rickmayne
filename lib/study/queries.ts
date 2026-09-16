@@ -3,6 +3,34 @@ import { uploadCourseFile, deleteCourseFile } from "./storage"
 import type { CourseProfile, StudyCourse, StudyCourseFile, StudyCourseFileStatus } from "./types"
 import type { IngestResult } from "./ingest-prompt"
 
+/**
+ * Un nouveau compte (inscription publique restée ouverte) peut se
+ * connecter et voir l'interface, mais ne peut pas créer de cours ni
+ * uploader de fichier tant qu'il n'a pas été approuvé manuellement — voir
+ * docs/db-anpassung.md §6quater. La vraie barrière est côté RLS (policy
+ * INSERT sur study_courses/study_course_files), cette fonction ne sert
+ * qu'à afficher le bon message côté UI avant même de tenter l'action —
+ * sans elle, un compte non approuvé verrait une erreur RLS brute et
+ * confuse au clic sur "Créer le cours".
+ */
+export async function isUserApproved(userId: string): Promise<boolean> {
+  const { data, error } = await getSupabaseClient()
+    .from("study_approved_users")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (error) {
+    // Fail-closed ici (pas fail-open comme le rate-limiter) : une erreur
+    // réseau/RLS ne doit jamais faire passer un compte non vérifié comme
+    // approuvé côté UI — au pire on affiche le message d'attente à tort,
+    // jamais l'inverse. La vraie protection reste la policy RLS de toute
+    // façon, ceci n'est qu'un affichage.
+    return false
+  }
+  return data !== null
+}
+
 export async function createStudyCourse(userId: string, title: string): Promise<StudyCourse> {
   const { data, error } = await getSupabaseClient()
     .from("study_courses")

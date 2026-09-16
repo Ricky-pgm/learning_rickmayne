@@ -12,12 +12,12 @@ import { Label } from "@/components/ui/label"
 import { Spinner } from "@/components/ui/spinner"
 import {
   ArrowLeft, Plus, FileText, Trash2, AlertCircle,
-  CheckCircle2, BookOpen, FileUp, ArrowRight, CalendarDays, Download,
+  CheckCircle2, BookOpen, FileUp, ArrowRight, CalendarDays, Download, ShieldAlert,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSupabaseClient } from "@/lib/supabase"
 import { getApiErrorMessage } from "@/lib/api-errors"
-import { listCourses, createCourse, deleteCourse, listFiles, uploadFile, deleteFile, setCourseExamDate } from "@/lib/study/queries"
+import { listCourses, createCourse, deleteCourse, listFiles, uploadFile, deleteFile, setCourseExamDate, isUserApproved } from "@/lib/study/queries"
 import { listAllStudyChaptersForUser } from "@/lib/study/lesson-queries"
 import { buildExamSchedule } from "@/lib/study/exam-schedule"
 import { buildICS } from "@/lib/study/ics-export"
@@ -26,6 +26,10 @@ import type { CourseProfile, StudyCourse, StudyCourseFile } from "@/lib/study/ty
 
 export default function EtudeDashboardManager() {
   const [userId, setUserId] = useState<string | null>(null)
+  // null = pas encore su (évite un flash "non approuvé" avant la réponse
+  // réseau) — voir isUserApproved, la vraie barrière reste RLS, ceci ne
+  // pilote que l'affichage.
+  const [approved, setApproved] = useState<boolean | null>(null)
   const [coursesLoaded, setCoursesLoaded] = useState(false)
   const [courses, setCourses] = useState<StudyCourse[]>([])
   const [selectedCourse, setSelectedCourse] = useState<StudyCourse | null>(null)
@@ -42,7 +46,9 @@ export default function EtudeDashboardManager() {
 
   useEffect(() => {
     getSupabaseClient().auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id ?? null)
+      const id = data.user?.id ?? null
+      setUserId(id)
+      if (id) isUserApproved(id).then(setApproved)
     })
   }, [])
 
@@ -223,65 +229,87 @@ export default function EtudeDashboardManager() {
         </Alert>
       )}
 
-      {/* Create form */}
+      {/* Create form — masqué derrière un message d'attente tant que le
+          compte n'a pas été approuvé manuellement (voir
+          docs/db-anpassung.md §6quater). approved === null pendant le
+          chargement : on ne montre ni l'un ni l'autre pour éviter un flash
+          du mauvais état. */}
       <Card className="border border-border/70 bg-card shadow-none">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Plus className="h-4 w-4" /> Nouveau cours
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="course-title">Titre du cours</Label>
-            <Input
-              id="course-title"
-              placeholder="Ex. Droit pénal général"
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") handleCreate() }}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Profil</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.entries(PROFILE_UI) as [CourseProfile, typeof PROFILE_UI[CourseProfile]][]).map(([key, { label, description, icon: Icon, dotColor }]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setNewProfile(key)}
-                  className={cn(
-                    "group relative overflow-hidden rounded-lg border p-3 text-left transition-all",
-                    newProfile === key
-                      ? "border-accent-brand bg-accent-brand/10 shadow-sm"
-                      : "border-border/70 hover:border-accent-brand/40 hover:bg-muted/40",
-                  )}
-                >
-                  {/* Pastille de couleur du profil plutôt qu'un simple
-                      contour sélectionné : la même teinte réapparaît sur
-                      la carte du cours une fois créé (bande latérale) et
-                      sur ChapterCard — un même code couleur traverse toute
-                      l'app plutôt que de s'arrêter à cet écran. */}
-                  <span className={cn("absolute right-2 top-2 h-1.5 w-1.5 rounded-full transition-transform", dotColor, newProfile === key ? "scale-125" : "scale-100 opacity-50")} />
-                  <Icon className={cn("h-5 w-5 transition-colors", newProfile === key ? "text-accent-brand" : "text-muted-foreground")} />
-                  <p className="text-sm font-medium mt-1">{label}</p>
-                  {/* Masquée sur mobile plutôt que wrap sur 3-4 lignes en
-                      text-xs — à 3 colonnes sur ~375px, ça donnait 3
-                      boutons de hauteurs inégales (la ligne la plus longue
-                      étirant les deux autres). L'icône + le label
-                      suffisent pour choisir au pouce ; le détail revient
-                      à partir de sm:. */}
-                  <p className="hidden text-xs text-muted-foreground mt-0.5 sm:block">{description}</p>
-                </button>
-              ))}
+        {approved === false ? (
+          <CardContent>
+            <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-4">
+              <ShieldAlert className="h-5 w-5 flex-shrink-0 text-warning" />
+              <div>
+                <p className="text-sm font-medium">Compte en attente d&apos;activation</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  La création de cours et l&apos;import de fichiers sont réservés aux comptes activés. Contacte l&apos;administrateur pour activer ton compte.
+                </p>
+              </div>
             </div>
-          </div>
+          </CardContent>
+        ) : approved === true ? (
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="course-title">Titre du cours</Label>
+              <Input
+                id="course-title"
+                placeholder="Ex. Droit pénal général"
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleCreate() }}
+              />
+            </div>
 
-          <Button onClick={handleCreate} disabled={!newTitle.trim() || creating} className="w-full sm:w-auto">
-            {creating ? <Spinner className="mr-2 size-4" /> : <Plus className="mr-2 h-4 w-4" />}
-            Créer le cours
-          </Button>
-        </CardContent>
+            <div className="space-y-2">
+              <Label>Profil</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.entries(PROFILE_UI) as [CourseProfile, typeof PROFILE_UI[CourseProfile]][]).map(([key, { label, description, icon: Icon, dotColor }]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setNewProfile(key)}
+                    className={cn(
+                      "group relative overflow-hidden rounded-lg border p-3 text-left transition-all",
+                      newProfile === key
+                        ? "border-accent-brand bg-accent-brand/10 shadow-sm"
+                        : "border-border/70 hover:border-accent-brand/40 hover:bg-muted/40",
+                    )}
+                  >
+                    {/* Pastille de couleur du profil plutôt qu'un simple
+                        contour sélectionné : la même teinte réapparaît sur
+                        la carte du cours une fois créé (bande latérale) et
+                        sur ChapterCard — un même code couleur traverse toute
+                        l'app plutôt que de s'arrêter à cet écran. */}
+                    <span className={cn("absolute right-2 top-2 h-1.5 w-1.5 rounded-full transition-transform", dotColor, newProfile === key ? "scale-125" : "scale-100 opacity-50")} />
+                    <Icon className={cn("h-5 w-5 transition-colors", newProfile === key ? "text-accent-brand" : "text-muted-foreground")} />
+                    <p className="text-sm font-medium mt-1">{label}</p>
+                    {/* Masquée sur mobile plutôt que wrap sur 3-4 lignes en
+                        text-xs — à 3 colonnes sur ~375px, ça donnait 3
+                        boutons de hauteurs inégales (la ligne la plus longue
+                        étirant les deux autres). L'icône + le label
+                        suffisent pour choisir au pouce ; le détail revient
+                        à partir de sm:. */}
+                    <p className="hidden text-xs text-muted-foreground mt-0.5 sm:block">{description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Button onClick={handleCreate} disabled={!newTitle.trim() || creating} className="w-full sm:w-auto">
+              {creating ? <Spinner className="mr-2 size-4" /> : <Plus className="mr-2 h-4 w-4" />}
+              Créer le cours
+            </Button>
+          </CardContent>
+        ) : (
+          <CardContent>
+            <div className="h-24 rounded-lg bg-muted/40 animate-pulse" />
+          </CardContent>
+        )}
       </Card>
 
       <Separator />
@@ -412,39 +440,54 @@ export default function EtudeDashboardManager() {
                       Fichiers ({files.length})
                     </h3>
 
-                    {/* Drop zone */}
-                    <div
-                      onDragOver={e => { e.preventDefault(); setDragging(true) }}
-                      onDragLeave={() => setDragging(false)}
-                      onDrop={handleDrop}
-                      className={cn(
-                        "relative flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center transition-all",
-                        dragging
-                          ? "scale-[1.01] border-accent-brand bg-accent-brand/10"
-                          : "border-border/50 bg-card hover:border-accent-brand/40 hover:bg-muted/20",
-                      )}
-                    >
-                      <FileUp className={cn("h-8 w-8 transition-transform", dragging ? "scale-110 text-accent-brand" : "text-muted-foreground/50")} />
-                      <p className="text-sm text-muted-foreground">
-                        {uploading ? (
-                          <span className="flex items-center gap-2"><Spinner className="size-4" /> Importation…</span>
-                        ) : (
-                          "Glisse un PDF ici ou "
+                    {/* Drop zone — masquée si le compte n'est pas approuvé
+                        (voir la Card "Nouveau cours" plus haut pour le même
+                        principe). En pratique un compte non approuvé n'a
+                        jamais de cours existant à déplier ici puisqu'il ne
+                        peut pas en créer — protection redondante, gardée
+                        par cohérence si un cours venait à être partagé un
+                        jour. */}
+                    {approved === false ? (
+                      <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-4">
+                        <ShieldAlert className="h-5 w-5 flex-shrink-0 text-warning" />
+                        <p className="text-sm text-muted-foreground">
+                          L&apos;import de fichiers est réservé aux comptes activés. Contacte l&apos;administrateur.
+                        </p>
+                      </div>
+                    ) : (
+                      <div
+                        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+                        onDragLeave={() => setDragging(false)}
+                        onDrop={handleDrop}
+                        className={cn(
+                          "relative flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center transition-all",
+                          dragging
+                            ? "scale-[1.01] border-accent-brand bg-accent-brand/10"
+                            : "border-border/50 bg-card hover:border-accent-brand/40 hover:bg-muted/20",
                         )}
-                      </p>
-                      {!uploading && (
-                        <label className="cursor-pointer text-sm font-medium text-accent-brand hover:underline">
-                          parcourir
-                          <input
-                            type="file"
-                            multiple
-                            accept=".pdf"
-                            className="sr-only"
-                            onChange={e => handleUpload(e.target.files)}
-                          />
-                        </label>
-                      )}
-                    </div>
+                      >
+                        <FileUp className={cn("h-8 w-8 transition-transform", dragging ? "scale-110 text-accent-brand" : "text-muted-foreground/50")} />
+                        <p className="text-sm text-muted-foreground">
+                          {uploading ? (
+                            <span className="flex items-center gap-2"><Spinner className="size-4" /> Importation…</span>
+                          ) : (
+                            "Glisse un PDF ici ou "
+                          )}
+                        </p>
+                        {!uploading && (
+                          <label className="cursor-pointer text-sm font-medium text-accent-brand hover:underline">
+                            parcourir
+                            <input
+                              type="file"
+                              multiple
+                              accept=".pdf"
+                              className="sr-only"
+                              onChange={e => handleUpload(e.target.files)}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
 
                     {/* File list */}
                     {files.length > 0 && (
