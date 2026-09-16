@@ -147,12 +147,19 @@ export default function EtudeDashboardManager() {
   }
 
   const [examDateDraft, setExamDateDraft] = useState<string>("")
+  // Resynchronise le brouillon avec le cours sélectionné pendant le rendu
+  // plutôt que dans un useEffect+setState (qui déclenche un rendu
+  // supplémentaire en cascade, react-hooks/set-state-in-effect) — pattern
+  // React recommandé pour "reset un état local éditable quand une autre
+  // valeur change" : on suit l'id du cours vu au dernier rendu et on
+  // resynchronise dès qu'il diffère, avant que le JSX ne soit produit.
+  const [lastSyncedCourseId, setLastSyncedCourseId] = useState<string | null | undefined>(undefined)
+  if (selectedCourse?.id !== lastSyncedCourseId) {
+    setLastSyncedCourseId(selectedCourse?.id ?? null)
+    setExamDateDraft(selectedCourse?.exam_date ?? "")
+  }
   const [savingExamDate, setSavingExamDate] = useState(false)
   const [exporting, setExporting] = useState(false)
-
-  useEffect(() => {
-    setExamDateDraft(selectedCourse?.exam_date ?? "")
-  }, [selectedCourse])
 
   async function handleSaveExamDate() {
     if (!selectedCourse) return

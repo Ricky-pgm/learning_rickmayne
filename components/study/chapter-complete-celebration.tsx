@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useState } from "react"
 import { PartyPopper, ArrowRight } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -31,16 +31,19 @@ const CONFETTI_COLORS = ["bg-accent-brand", "bg-success", "bg-warning", "bg-dest
 export function ChapterCompleteCelebration({ open, onClose, chapterTitle, nextHref, nextChapterTitle }: Props) {
   // Générées une seule fois par montage, pas à chaque re-render — sinon
   // l'animation recommencerait de zéro à chaque frappe/état parent.
-  const confetti = useMemo(
-    () =>
-      Array.from({ length: 24 }, (_, i) => ({
-        left: Math.random() * 100,
-        delay: Math.random() * 0.4,
-        duration: 1.4 + Math.random() * 0.8,
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-        rotate: Math.random() * 360,
-      })),
-    [],
+  // useState(() => ...) plutôt que useMemo : Math.random() dans le corps
+  // du composant (même mémoïsé) viole la règle de pureté du rendu
+  // react-hooks/purity — un initialiseur useState lazy est le mécanisme
+  // React explicitement prévu pour une valeur initiale non déterministe,
+  // calculée une seule fois hors du chemin de rendu pur.
+  const [confetti] = useState(() =>
+    Array.from({ length: 24 }, (_, i) => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 0.4,
+      duration: 1.4 + Math.random() * 0.8,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      rotate: Math.random() * 360,
+    })),
   )
 
   return (

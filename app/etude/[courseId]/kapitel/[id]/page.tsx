@@ -119,15 +119,17 @@ export default function StudyChapterPage({
   }, [chapter])
 
   // Déclenche la célébration exactement au passage à 3 phases faites —
-  // recalculé ici plutôt qu'à partir de la variable phasesDone plus bas
-  // (dérivée après les early-returns) pour rester un Hook inconditionnel.
-  useEffect(() => {
-    const done = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (completedExercises.size > 0 ? 1 : 0)
-    if (done >= 3 && !celebrationShown) {
-      setShowCelebration(true)
-      setCelebrationShown(true)
-    }
-  }, [lessonOpened, flashcardsDone, completedExercises, celebrationShown])
+  // recalculé ici (avant les early-returns, pour rester un Hook
+  // inconditionnel) plutôt que dans un useEffect+setState : le calcul ne
+  // dépend que de l'état déjà présent à ce rendu, donc setState pendant le
+  // rendu lui-même évite un rendu en cascade supplémentaire
+  // (react-hooks/set-state-in-effect) — seule la garde !celebrationShown
+  // fait de ceci un effet de bord, pas un vrai calcul dérivé pur.
+  const phasesDoneForCelebration = (lessonOpened ? 1 : 0) + (flashcardsDone ? 1 : 0) + (completedExercises.size > 0 ? 1 : 0)
+  if (phasesDoneForCelebration >= 3 && !celebrationShown) {
+    setShowCelebration(true)
+    setCelebrationShown(true)
+  }
 
   if (loading) {
     return (
