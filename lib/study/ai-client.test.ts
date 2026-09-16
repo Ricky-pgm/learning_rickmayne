@@ -40,6 +40,24 @@ describe("extractJSON", () => {
     expect(result.code).toBe("line1\nline2")
   })
 
+  it("échappe un guillemet interne non échappé au milieu d'une valeur (cas réel : flashcards allemandes citant un terme entre guillemets)", () => {
+    const raw = '{"back_de": "Achtung: man verwechselt oft "X" mit "Y". Wichtig."}'
+    const result = extractJSON(raw) as { back_de: string }
+    expect(result.back_de).toBe('Achtung: man verwechselt oft "X" mit "Y". Wichtig.')
+  })
+
+  it("échappe un guillemet interne juste avant la fin du tableau", () => {
+    const raw = '{"list": ["a", "mot "cité" en fin"]}'
+    const result = extractJSON(raw) as { list: string[] }
+    expect(result.list[1]).toBe('mot "cité" en fin')
+  })
+
+  it("gère un guillemet interne combiné à une virgule traînante dans la même réponse", () => {
+    const raw = '{"cards": [{"front": "Q?", "back": "dit "oui" ici",}]}'
+    const result = extractJSON(raw) as { cards: { front: string; back: string }[] }
+    expect(result.cards[0].back).toBe('dit "oui" ici')
+  })
+
   it("lève une erreur explicite si aucune accolade n'est trouvée", () => {
     expect(() => extractJSON("pas de json ici")).toThrow("Pas de JSON trouvé")
   })

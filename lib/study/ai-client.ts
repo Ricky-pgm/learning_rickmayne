@@ -101,6 +101,60 @@ function stripTrailingCommas(text: string): string {
   return text.replace(/,(\s*[}\]])/g, "$1")
 }
 
+/**
+ * Échappe un guillemet interne non échappé à l'intérieur d'une valeur de
+ * chaîne — ex. `"back_de": "Achtung: man verwechselt oft "X" mit "Y""`
+ * (observé sur flashcard-prompt.ts, dont l'exemple donné au modèle contient
+ * lui-même des guillemets de citation, imités sans échappement). Un tel
+ * guillemet ferme la chaîne JSON prématurément ; le parseur tombe ensuite
+ * sur du texte brut et rapporte "Expected ',' or ']'/'}' after ..." — un
+ * message qui ne mentionne jamais explicitement un guillemet, donc facile
+ * à confondre avec une virgule vraiment manquante.
+ *
+ * Heuristique par lookahead (pas un vrai tokenizer JSON, mais suffisant en
+ * pratique) : un `"` rencontré dans une chaîne ferme réellement la valeur
+ * seulement si le prochain caractère non-blanc est `,`, `:`, `}`, `]`, ou
+ * la fin du texte — sinon c'est un guillemet interne à échapper.
+ */
+function escapeUnescapedInnerQuotes(text: string): string {
+  let out = ""
+  let inString = false
+  let escaped = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (!inString) {
+      out += ch
+      if (ch === '"') inString = true
+      continue
+    }
+    if (escaped) {
+      out += ch
+      escaped = false
+      continue
+    }
+    if (ch === "\\") {
+      out += ch
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      let j = i + 1
+      while (j < text.length && /\s/.test(text[j])) j++
+      const next = text[j]
+      const closesString = next === undefined || [",", ":", "}", "]"].includes(next)
+      if (closesString) {
+        out += ch
+        inString = false
+      } else {
+        out += '\\"'
+      }
+      continue
+    }
+    out += ch
+  }
+  return out
+}
+
 export function extractJSON(text: string): unknown {
   const start = text.indexOf("{")
   const end = text.lastIndexOf("}")
@@ -111,11 +165,14 @@ export function extractJSON(text: string): unknown {
     return JSON.parse(raw)
   } catch {
     // Repli en deux passes plutôt qu'un échec immédiat : la plupart des
-    // erreurs observées (caractère de contrôle, virgule manquante) sont
-    // des défauts de formatage isolés, pas un JSON réellement tronqué —
-    // pas besoin de rappeler l'API pour ça.
+    // erreurs observées (caractère de contrôle, virgule traînante,
+    // guillemet interne non échappé) sont des défauts de formatage
+    // isolés, pas un JSON réellement tronqué — pas besoin de rappeler
+    // l'API pour ça.
     try {
-      return JSON.parse(stripTrailingCommas(sanitizeControlCharsInStrings(raw)))
+      return JSON.parse(
+        escapeUnescapedInnerQuotes(stripTrailingCommas(sanitizeControlCharsInStrings(raw)))
+      )
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e)
       throw new Error(`JSON invalide dans la réponse IA (${detail})`)
