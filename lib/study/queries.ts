@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase"
-import { uploadCourseFile, deleteCourseFile } from "./storage"
+import { uploadCourseFile, deleteCourseFile, deleteCourseFiles } from "./storage"
 import type { CourseProfile, StudyCourse, StudyCourseFile, StudyCourseFileStatus } from "./types"
 import type { IngestResult } from "./ingest-prompt"
 
@@ -91,7 +91,34 @@ export async function listStudyCourses(userId: string): Promise<StudyCourse[]> {
 /** Alias de listStudyCourses — utilisé par app/etude/dashboard/page.tsx. */
 export const listCourses = listStudyCourses
 
+/**
+ * Le `on delete cascade` de study_course_files (voir migrations) nettoie
+ * les LIGNES DB des fichiers, mais jamais les objets réels dans le bucket
+ * Storage — sans lister et supprimer explicitement ces objets AVANT de
+ * supprimer le cours, les PDF restaient orphelins dans le bucket (bug
+ * confirmé par l'audit, F-1) : plus aucune ligne DB ne les référence donc
+ * plus aucun moyen de les lister ni de les nettoyer depuis l'UI, alors
+ * que le texte du bouton promet explicitement "et tous ses fichiers".
+ * L'ordre compte : lister les storage_path avant le delete (sinon le
+ * cascade a déjà fait disparaître les lignes qu'on veut lire), puis
+ * nettoyer le bucket avant la ligne study_courses elle-même (si la
+ * suppression du cours réussissait avant, un échec du nettoyage Storage
+ * laisserait le cours disparu de l'UI mais ses fichiers introuvables et
+ * définitivement orphelins — l'ordre inverse permet au moins de réessayer
+ * si le nettoyage Storage échoue, le cours restant visible).
+ */
 export async function deleteCourse(studyCourseId: string): Promise<void> {
+  const { data: files, error: filesError } = await getSupabaseClient()
+    .from("study_course_files")
+    .select("storage_path")
+    .eq("study_course_id", studyCourseId)
+
+  if (filesError) {
+    throw new Error(`Impossible de lister les fichiers du cours: ${filesError.message}`)
+  }
+
+  await deleteCourseFiles((files ?? []).map(f => f.storage_path))
+
   const { error } = await getSupabaseClient()
     .from("study_courses")
     .delete()

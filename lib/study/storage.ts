@@ -59,3 +59,26 @@ export async function deleteCourseFile(storagePath: string): Promise<void> {
     throw new Error(`Échec de la suppression: ${error.message}`)
   }
 }
+
+/**
+ * Supprime plusieurs fichiers d'un coup — utilisé par deleteCourse
+ * (queries.ts) pour nettoyer tous les PDF d'un cours avant de supprimer
+ * la ligne study_courses elle-même. Sans ça (bug confirmé par l'audit,
+ * F-1), le `on delete cascade` de study_course_files ne supprime que les
+ * lignes DB, jamais les objets réels dans le bucket Storage — les PDF
+ * restaient orphelins, non référencés par aucune ligne DB donc plus
+ * jamais listés ni nettoyables depuis l'UI, alors que le texte du
+ * confirm() promet explicitement "et tous ses fichiers". Sur le plan
+ * Supabase Free (quota de stockage limité), quelques cours abandonnés
+ * suffisent à saturer le quota sans qu'on puisse le voir depuis l'app.
+ * Aucune erreur levée si `paths` est vide (rien à faire).
+ */
+export async function deleteCourseFiles(storagePaths: string[]): Promise<void> {
+  if (storagePaths.length === 0) return
+
+  const { error } = await getSupabaseClient().storage.from(BUCKET).remove(storagePaths)
+
+  if (error) {
+    throw new Error(`Échec de la suppression des fichiers: ${error.message}`)
+  }
+}
