@@ -5,7 +5,7 @@ import { extractTextBlock } from "@/lib/anthropic-response"
 // ce fichier est un jour partagé entre les deux modes.
 type ClaudeModel = "claude-sonnet-5" | "claude-sonnet-4-6" | "claude-haiku-4-5"
 
-type EffortLevel = "low" | "medium" | "high" | "xhigh" | "max"
+export type EffortLevel = "low" | "medium" | "high" | "xhigh" | "max"
 
 interface CallClaudeOptions {
   model: ClaudeModel

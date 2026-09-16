@@ -1,49 +1,13 @@
 import { buildSpeedRoundPrompt } from '@/lib/study/speed-round-prompt'
-import { getApiErrorMessage } from '@/lib/api-errors'
-import { parseJsonBody } from '@/lib/api-request'
-import { callClaude, extractJSON, ClaudeApiError } from '@/lib/study/ai-client'
-import { getChapterForPrompt } from '@/lib/study/get-chapter-for-prompt'
-import { getSupabaseServerClient } from '@/lib/supabase-server'
-import { checkAndConsumeAiQuota, RateLimitError } from '@/lib/study/rate-limit'
+import { createGenerationRoute } from '@/lib/study/create-generation-route'
 
-export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return Response.json(
-      { error: getApiErrorMessage('ANTHROPIC_API_KEY') },
-      { status: 500 }
-    )
-  }
-
-  const body = await parseJsonBody<{ chapterId?: string }>(req)
-  const chapterId = body?.chapterId
-  if (!chapterId || typeof chapterId !== 'string') {
-    return Response.json({ error: 'chapterId manquant' }, { status: 400 })
-  }
-
-  try {
-    await checkAndConsumeAiQuota(await getSupabaseServerClient(), 'light')
-  } catch (e) {
-    if (e instanceof RateLimitError) return Response.json({ error: e.message }, { status: 429 })
-    throw e
-  }
-
+export const POST = createGenerationRoute({
+  logLabel: 'study/speed-round',
+  quotaCategory: 'light',
+  model: 'claude-haiku-4-5',
+  maxTokens: 3000,
   // Résolu via RLS — profile vient aussi du chapitre en DB plutôt que du
   // client (study_chapters.profile, synchronisé par trigger depuis
   // study_courses.profile), voir get-chapter-for-prompt.ts.
-  const chapter = await getChapterForPrompt(chapterId)
-  if (!chapter) {
-    return Response.json({ error: 'Chapitre introuvable ou accès refusé' }, { status: 404 })
-  }
-
-  const prompt = buildSpeedRoundPrompt(chapter, chapter.profile)
-
-  try {
-    const text = await callClaude({ model: 'claude-haiku-4-5', prompt, maxTokens: 3000 })
-    const parsed = extractJSON(text)
-    return Response.json(parsed)
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    console.error('[study/speed-round]', message)
-    return Response.json({ error: message }, { status: e instanceof ClaudeApiError ? e.status : 500 })
-  }
-}
+  buildPrompt: chapter => buildSpeedRoundPrompt(chapter, chapter.profile),
+})
