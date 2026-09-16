@@ -151,8 +151,9 @@ export async function updateStudyCourseFileStatus(
       // PROCESSING_STUCK_AFTER_MS dans app/etude/[courseId]/page.tsx.
       // Ne touche jamais next_slice_index ici : passer en "processing" est
       // aussi ce que fait un "Réessayer" sur une tranche en échec — il ne
-      // faut pas reperdre la progression déjà acquise (voir
-      // advanceNextSliceIndex, qui l'avance après chaque tranche réussie).
+      // faut pas reperdre la progression déjà acquise (voir la RPC
+      // save_ingest_result, supabase/migrations/0007, qui l'avance après
+      // chaque tranche réussie).
       processed_at: new Date().toISOString(),
     })
     .eq("id", fileId)
@@ -162,34 +163,10 @@ export async function updateStudyCourseFileStatus(
   }
 }
 
-/**
- * Avance la progression après une tranche traitée avec succès — "Réessayer"
- * repart de cette tranche plutôt que de la première, évitant de retraiter
- * (et repayer) les tranches déjà acquises. Voir docs/db-anpassung.md §3.
- */
-export async function advanceNextSliceIndex(fileId: string, sliceIndex: number): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .from("study_course_files")
-    .update({ next_slice_index: sliceIndex + 1 })
-    .eq("id", fileId)
-
-  if (error) {
-    throw new Error(`Impossible d'enregistrer la progression: ${error.message}`)
-  }
-}
-
-export async function countStudyChapters(studyCourseId: string): Promise<number> {
-  const { count, error } = await getSupabaseClient()
-    .from("study_chapters")
-    .select("id", { count: "exact", head: true })
-    .eq("study_course_id", studyCourseId)
-
-  if (error) {
-    throw new Error(`Impossible de compter les chapitres: ${error.message}`)
-  }
-
-  return count ?? 0
-}
+// advanceNextSliceIndex et countStudyChapters ont existé ici — absorbées
+// dans la RPC save_ingest_result (supabase/migrations/0007) pour que
+// calcul d'offset + insertion + avancement de tranche soient une seule
+// transaction atomique. Voir le commentaire de saveIngestResult ci-dessous.
 
 export async function listStudyCourseFiles(studyCourseId: string): Promise<StudyCourseFile[]> {
   const { data, error } = await getSupabaseClient()
@@ -252,70 +229,55 @@ export async function deleteFile(studyCourseId: string, fileId: string): Promise
 
 /**
  * Enregistre le découpage en chapitres validé par l'utilisateur, met à
- * jour le profil détecté du cours, et rattache les chapitres au fichier
- * source. chapterOrderOffset permet de numéroter en continu quand un cours
- * a été ingéré en plusieurs fichiers/tranches (§5.3 étape 1).
+ * jour le profil détecté du cours, rattache les chapitres au fichier
+ * source, ET avance next_slice_index — tout dans une seule transaction
+ * côté DB (RPC save_ingest_result, supabase/migrations/0007), pas trois
+ * appels séparés comme avant (count → insert → update).
+ *
+ * Corrige deux bugs confirmés par l'audit sécurité :
+ * - Race condition (C-3) : l'offset de numérotation était calculé côté
+ *   client (SELECT count(*) séparé, sans transaction) — deux ingestions
+ *   concurrentes sur le même cours pouvaient lire le même compte et
+ *   tenter d'insérer les mêmes "order", faisant échouer tout le lot après
+ *   avoir déjà payé la tranche Sonnet. La RPC verrouille la ligne du
+ *   cours (SELECT ... FOR UPDATE) pendant le calcul + l'insertion, ce qui
+ *   sérialise les appels concurrents au lieu de les laisser courir en
+ *   parallèle sur une valeur périmée — vérifié réellement avec deux
+ *   transactions concurrentes sur une instance Postgres locale : aucune
+ *   collision, aucune perte, la deuxième attend la première.
+ * - Non-idempotence (F-2) : si l'avancement de next_slice_index (alors un
+ *   appel séparé, advanceNextSliceIndex) échouait après que les chapitres
+ *   aient déjà été insérés (réseau coupé — le cas le plus probable en
+ *   plein milieu d'une ingestion longue), un "Réessayer" rejouait (et
+ *   repayait) la même tranche Sonnet et dupliquait ses chapitres sous un
+ *   nouvel offset. Les deux opérations sont maintenant dans la même
+ *   transaction : l'une ne peut plus réussir sans l'autre.
+ *
+ * sliceIndex identifie la tranche en cours (0-based, voir
+ * lib/study/pdf-split.ts) — la RPC avance next_slice_index à
+ * sliceIndex + 1, même sémantique que l'ancien advanceNextSliceIndex.
  */
 export async function saveIngestResult(
   studyCourseId: string,
   sourceFileId: string,
   ingestResult: Pick<IngestResult, "profile" | "detected_language" | "chapters">,
-  chapterOrderOffset: number
+  sliceIndex: number
 ): Promise<void> {
-  const client = getSupabaseClient()
+  const { error } = await getSupabaseClient().rpc("save_ingest_result", {
+    p_study_course_id: studyCourseId,
+    p_source_file_id: sourceFileId,
+    p_profile: ingestResult.profile,
+    p_detected_lang: ingestResult.detected_language,
+    p_chapters: ingestResult.chapters,
+    p_slice_index: sliceIndex,
+  })
 
-  const { data: userData, error: userError } = await client.auth.getUser()
-  if (userError || !userData.user) {
-    throw new Error("Utilisateur non authentifié")
-  }
-
-  // sourceFileId et studyCourseId viennent tous les deux du client — rien
-  // côté API d'ingestion ne les recoupe (elle ne connaît que fileId, pas le
-  // cours auquel le résultat sera rattaché). Sans ce contrôle, un mauvais
-  // couple (fileId, courseId) attacherait silencieusement des chapitres au
-  // mauvais cours de l'utilisateur.
-  const { data: fileRow, error: fileCheckError } = await client
-    .from("study_course_files")
-    .select("study_course_id")
-    .eq("id", sourceFileId)
-    .maybeSingle()
-
-  if (fileCheckError || !fileRow) {
-    throw new Error("Fichier source introuvable ou accès refusé")
-  }
-  if (fileRow.study_course_id !== studyCourseId) {
-    throw new Error("Ce fichier n'appartient pas au cours indiqué")
-  }
-
-  const { error: profileError } = await client
-    .from("study_courses")
-    .update({ profile: ingestResult.profile as CourseProfile, detected_lang: ingestResult.detected_language })
-    .eq("id", studyCourseId)
-
-  if (profileError) {
-    throw new Error(`Impossible de mettre à jour le profil du cours: ${profileError.message}`)
-  }
-
-  const rows = ingestResult.chapters.map(chapter => ({
-    study_course_id: studyCourseId,
-    user_id: userData.user.id,
-    order: chapter.order + chapterOrderOffset,
-    title_de: chapter.title_de,
-    title_fr: chapter.title_fr,
-    concepts: chapter.concepts,
-    summary: chapter.summary,
-    has_code: chapter.has_code,
-    code_lang: chapter.code_lang,
-    is_organizational: chapter.is_organizational,
-    source_file_id: sourceFileId,
-  }))
-
-  const { error: chaptersError } = await client.from("study_chapters").insert(rows)
-
-  if (chaptersError) {
-    // Le code Postgres (ex. 23505 = clé dupliquée sur l'ordre des chapitres,
-    // deux onglets qui génèrent en parallèle) est préservé dans le message
-    // pour que getApiErrorMessage puisse le traduire en texte lisible.
-    throw new Error(`Impossible d'enregistrer les chapitres [${chaptersError.code ?? "?"}]: ${chaptersError.message}`)
+  if (error) {
+    // Le message de la RPC (ex. "Ce fichier n'appartient pas au cours
+    // indiqué") est déjà lisible tel quel — pas de code Postgres à
+    // traduire ici, contrairement à l'ancien insert direct où 23505
+    // (collision d'ordre) pouvait remonter : cette collision n'est plus
+    // possible, la RPC calcule l'offset sous verrou.
+    throw new Error(`Impossible d'enregistrer les chapitres: ${error.message}`)
   }
 }

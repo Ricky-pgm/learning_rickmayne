@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { ArrowLeft, ArrowRight, FileText, Sparkles, AlertCircle, CheckCircle2, BookOpen, Clock, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getApiErrorMessage } from "@/lib/api-errors"
-import { getStudyCourse, listFiles, updateStudyCourseFileStatus, saveIngestResult, countStudyChapters, advanceNextSliceIndex } from "@/lib/study/queries"
+import { getStudyCourse, listFiles, updateStudyCourseFileStatus, saveIngestResult } from "@/lib/study/queries"
 import { listStudyChaptersWithProgress, type StudyChapterWithProgress } from "@/lib/study/lesson-queries"
 import { PROFILE_UI } from "@/lib/study/profile-ui"
 import { estimateChapterTime } from "@/lib/study/time-estimate"
@@ -93,8 +93,9 @@ export default function EtudeCoursePage() {
       // "Réessayer" reprend à la tranche qui a échoué, pas à la première —
       // sans ça, chaque nouvelle tentative retraitait (et repayait) les
       // tranches déjà réussies. next_slice_index avance après chaque
-      // tranche traitée avec succès (voir advanceNextSliceIndex),
-      // remis à 0 par défaut pour tout nouveau fichier.
+      // tranche traitée avec succès (voir la RPC save_ingest_result,
+      // supabase/migrations/0007), remis à 0 par défaut pour tout nouveau
+      // fichier.
       const startIndex = Math.min(file.next_slice_index, plan.slices.length)
 
       for (let i = startIndex; i < plan.slices.length; i++) {
@@ -116,9 +117,11 @@ export default function EtudeCoursePage() {
         }
 
         const ingestResult = data as IngestResult
-        const existingCount = await countStudyChapters(courseId)
-        await saveIngestResult(courseId, file.id, ingestResult, existingCount)
-        await advanceNextSliceIndex(file.id, i)
+        // saveIngestResult fait maintenant tout dans une seule transaction
+        // côté DB (calcul d'offset, insertion des chapitres, avancement de
+        // la tranche) — voir son commentaire dans lib/study/queries.ts pour
+        // le bug de race condition + duplication que ça corrige.
+        await saveIngestResult(courseId, file.id, ingestResult, i)
 
         // Chaque tranche traitée est déjà sauvegardée en base — si une
         // tranche suivante échoue, les chapitres déjà générés restent
